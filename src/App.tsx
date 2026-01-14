@@ -3,8 +3,10 @@ import { GraphCanvas } from './components/graph/GraphCanvas';
 import { FileUpload } from './components/data-source/FileUpload';
 import { UrlInput } from './components/data-source/UrlInput';
 import { NodeDetailsPanel } from './components/panels/NodeDetailsPanel';
+import { Sidebar } from './components/layout/Sidebar';
 import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
+import { useApplyFilters } from './hooks/useFilters';
 import { applyLayout } from './lib/graph/layout';
 
 function App() {
@@ -13,6 +15,9 @@ function App() {
   const error = useAppStore((state) => state.error);
   const clearData = useAppStore((state) => state.clearData);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
+
+  // Apply filters to graph
+  useApplyFilters();
 
   // Apply layout when graph changes
   useEffect(() => {
@@ -80,6 +85,7 @@ function App() {
         ) : (
           // Graph view
           <>
+            <Sidebar />
             <GraphCanvas className="flex-1" />
             {selectedNodeId && <NodeDetailsPanel />}
           </>

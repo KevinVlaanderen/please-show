@@ -3,6 +3,7 @@ import { SigmaContainer, useRegisterEvents, useSigma } from '@react-sigma/core';
 import '@react-sigma/core/lib/style.css';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
+import { GraphControls } from './GraphControls';
 import type { GraphNodeAttributes, GraphEdgeAttributes } from '../../types/graph';
 
 function GraphEvents() {
@@ -45,6 +46,27 @@ function GraphLoader() {
       sigma.refresh();
     }
   }, [graph, sigma]);
+
+  return null;
+}
+
+function CameraController() {
+  const sigma = useSigma();
+  const focusedNodeId = useUIStore((state) => state.focusedNodeId);
+  const setFocusedNode = useUIStore((state) => state.setFocusedNode);
+
+  useEffect(() => {
+    if (!focusedNodeId) return;
+
+    const graph = sigma.getGraph();
+    if (graph.hasNode(focusedNodeId)) {
+      const attrs = graph.getNodeAttributes(focusedNodeId);
+      sigma.getCamera().animate({ x: attrs.x, y: attrs.y, ratio: 0.5 }, { duration: 300 });
+    }
+
+    // Clear the focused node after animating
+    setFocusedNode(null);
+  }, [focusedNodeId, sigma, setFocusedNode]);
 
   return null;
 }
@@ -98,6 +120,8 @@ export function GraphCanvas({ className }: GraphCanvasProps) {
     >
       <GraphEvents />
       <GraphLoader />
+      <CameraController />
+      <GraphControls />
     </SigmaContainer>
   );
 }

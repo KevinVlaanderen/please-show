@@ -8,6 +8,7 @@ interface UIState {
   // Selection
   selectedNodeId: string | null;
   hoveredNodeId: string | null;
+  focusedNodeId: string | null; // Node to center camera on
 
   // Highlighting
   highlightedPath: string[];
@@ -23,6 +24,7 @@ interface UIState {
   setDetailsPanelOpen: (open: boolean) => void;
   selectNode: (id: string | null) => void;
   setHoveredNode: (id: string | null) => void;
+  setFocusedNode: (id: string | null) => void;
   highlightPath: (path: string[]) => void;
   highlightCycles: (cycles: string[][]) => void;
   clearHighlights: () => void;
@@ -35,6 +37,7 @@ export const useUIStore = create<UIState>((set) => ({
   detailsPanelOpen: false,
   selectedNodeId: null,
   hoveredNodeId: null,
+  focusedNodeId: null,
   highlightedPath: [],
   highlightedCycles: [],
   searchQuery: '',
@@ -51,6 +54,7 @@ export const useUIStore = create<UIState>((set) => ({
     }),
 
   setHoveredNode: (id) => set({ hoveredNodeId: id }),
+  setFocusedNode: (id) => set({ focusedNodeId: id }),
 
   highlightPath: (path) => set({ highlightedPath: path }),
   highlightCycles: (cycles) => set({ highlightedCycles: cycles }),
