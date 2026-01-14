@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import { findShortestPath } from '../../lib/analysis/pathFinder';
+import { findCycles } from '../../lib/analysis/cycleDetector';
 
 export function AnalysisPanel() {
   const graph = useAppStore((state) => state.graph);
@@ -13,6 +14,7 @@ export function AnalysisPanel() {
   const [targetNode, setTargetNode] = useState('');
   const [pathResult, setPathResult] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cycles, setCycles] = useState<string[][] | null>(null);
 
   const handleFindPath = useCallback(() => {
     if (!graph || !sourceNode || !targetNode) return;
@@ -45,8 +47,26 @@ export function AnalysisPanel() {
     setTargetNode('');
     setPathResult(null);
     setError(null);
+    setCycles(null);
     clearHighlights();
   }, [clearHighlights]);
+
+  const handleDetectCycles = useCallback(() => {
+    if (!graph) return;
+
+    const foundCycles = findCycles(graph);
+    setCycles(foundCycles);
+
+    if (foundCycles.length > 0) {
+      // Highlight all nodes in cycles
+      const cycleNodes = new Set<string>();
+      foundCycles.forEach(cycle => cycle.forEach(node => cycleNodes.add(node)));
+      highlightPath(Array.from(cycleNodes));
+      setFocusedNode(foundCycles[0][0]);
+    } else {
+      highlightPath([]);
+    }
+  }, [graph, highlightPath, setFocusedNode]);
 
   return (
     <div className="p-3 border-t border-slate-200">
@@ -108,6 +128,40 @@ export function AnalysisPanel() {
             </ul>
           </div>
         )}
+
+        <div className="border-t border-slate-200 pt-3">
+          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+            Cycle Detection
+          </h4>
+          <button
+            onClick={handleDetectCycles}
+            className="w-full px-3 py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-700"
+          >
+            Detect Cycles
+          </button>
+
+          {cycles !== null && (
+            <div className="mt-2">
+              {cycles.length === 0 ? (
+                <p className="text-sm text-green-600">No cycles found</p>
+              ) : (
+                <div>
+                  <p className="text-sm text-red-600 mb-1">
+                    Found {cycles.length} cycle(s)
+                  </p>
+                  <ul className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                    {cycles.map((cycle, i) => (
+                      <li key={i} className="text-slate-600">
+                        <span className="font-medium">Cycle {i + 1}:</span>{' '}
+                        {cycle.length} nodes
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
