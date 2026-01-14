@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { GraphCanvas } from './components/graph/GraphCanvas';
 import { FileUpload } from './components/data-source/FileUpload';
 import { UrlInput } from './components/data-source/UrlInput';
@@ -9,7 +8,7 @@ import { useUIStore } from './stores/uiStore';
 import { useApplyFilters } from './hooks/useFilters';
 import { useApplyColorScheme } from './hooks/useColorScheme';
 import { useApplyHighlights } from './hooks/useHighlights';
-import { applyLayout } from './lib/graph/layout';
+import { useApplyLayout } from './hooks/useLayout';
 
 function App() {
   const graph = useAppStore((state) => state.graph);
@@ -18,17 +17,11 @@ function App() {
   const clearData = useAppStore((state) => state.clearData);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
 
-  // Apply filters, colors, and highlights to graph
+  // Apply filters, colors, highlights, and layout to graph
   useApplyFilters();
   useApplyColorScheme();
   useApplyHighlights();
-
-  // Apply layout when graph changes
-  useEffect(() => {
-    if (graph) {
-      applyLayout(graph, 'forceAtlas2', { iterations: 100 });
-    }
-  }, [graph]);
+  useApplyLayout();
 
   return (
     <div className="h-screen flex flex-col bg-slate-50">
