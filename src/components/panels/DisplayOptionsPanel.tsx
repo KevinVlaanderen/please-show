@@ -20,6 +20,8 @@ export function DisplayOptionsPanel() {
   const clusteringStrength = useLayoutStore((state) => state.clusteringStrength);
   const setClusteringStrength = useLayoutStore((state) => state.setClusteringStrength);
   const triggerRelayout = useLayoutStore((state) => state.triggerRelayout);
+  const showHulls = useLayoutStore((state) => state.showHulls);
+  const setShowHulls = useLayoutStore((state) => state.setShowHulls);
 
   return (
     <div className="p-3 border-t border-slate-200">
@@ -85,6 +87,16 @@ export function DisplayOptionsPanel() {
             ))}
           </div>
         )}
+
+        <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 mt-2">
+          <input
+            type="checkbox"
+            checked={showHulls}
+            onChange={(e) => setShowHulls(e.target.checked)}
+            className="text-indigo-600 focus:ring-indigo-500 rounded"
+          />
+          <span className="text-sm text-slate-700">Show cluster hulls</span>
+        </label>
 
         <button
           onClick={triggerRelayout}

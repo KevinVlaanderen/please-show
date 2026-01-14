@@ -40,14 +40,14 @@ function calculatePackagePositions(
     }
   });
 
-  // Position root packages in a circle
+  // Position root packages in a circle (increased spacing for hull visibility)
   const angleStep = (2 * Math.PI) / Math.max(rootPackages.length, 1);
   rootPackages.forEach((pkg, i) => {
     const angle = i * angleStep;
     positions.set(pkg, {
-      centerX: Math.cos(angle) * scale * 0.4,
-      centerY: Math.sin(angle) * scale * 0.4,
-      radius: scale * 0.2,
+      centerX: Math.cos(angle) * scale * 0.6,
+      centerY: Math.sin(angle) * scale * 0.6,
+      radius: scale * 0.25,
     });
   });
 

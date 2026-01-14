@@ -4,6 +4,7 @@ import '@react-sigma/core/lib/style.css';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import { GraphControls } from './GraphControls';
+import { HullRenderer } from './HullRenderer';
 import type { GraphNodeAttributes, GraphEdgeAttributes } from '../../types/graph';
 
 function GraphEvents() {
@@ -108,6 +109,7 @@ export function GraphCanvas({ className }: GraphCanvasProps) {
       <GraphEvents />
       <GraphLoader />
       <CameraController />
+      <HullRenderer />
       <GraphControls />
     </SigmaContainer>
   );
