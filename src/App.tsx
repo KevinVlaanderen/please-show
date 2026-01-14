@@ -7,6 +7,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
 import { useApplyFilters } from './hooks/useFilters';
+import { useApplyColorScheme } from './hooks/useColorScheme';
 import { applyLayout } from './lib/graph/layout';
 
 function App() {
@@ -16,8 +17,9 @@ function App() {
   const clearData = useAppStore((state) => state.clearData);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
 
-  // Apply filters to graph
+  // Apply filters and colors to graph
   useApplyFilters();
+  useApplyColorScheme();
 
   // Apply layout when graph changes
   useEffect(() => {
