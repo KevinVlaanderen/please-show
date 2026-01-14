@@ -1,6 +1,7 @@
 import { SearchPanel } from '../panels/SearchPanel';
 import { FilterPanel } from '../panels/FilterPanel';
 import { DisplayOptionsPanel } from '../panels/DisplayOptionsPanel';
+import { AnalysisPanel } from '../panels/AnalysisPanel';
 
 interface SidebarProps {
   className?: string;
@@ -13,6 +14,7 @@ export function Sidebar({ className }: SidebarProps) {
       <div className="flex-1 overflow-y-auto">
         <FilterPanel />
         <DisplayOptionsPanel />
+        <AnalysisPanel />
       </div>
     </aside>
   );
