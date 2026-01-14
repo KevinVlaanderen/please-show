@@ -15,6 +15,19 @@ function isPackageExcluded(nodePackage: string, excludedPackages: string[]): boo
   });
 }
 
+/**
+ * Check if a label matches any excluded label.
+ * Handles hierarchical matching: excluding "go" also excludes "go:binary", "go:test", etc.
+ */
+function isLabelExcluded(label: string, excludedLabels: string[]): boolean {
+  return excludedLabels.some((excluded) => {
+    if (label === excluded) return true;
+    // Check if label is a child of excluded (e.g., "go:binary" is child of "go")
+    if (label.startsWith(excluded + ':')) return true;
+    return false;
+  });
+}
+
 export function useApplyFilters() {
   const graph = useAppStore((state) => state.graph);
   const { excludedPackages, excludedLabels, showBinaryOnly } = useFilterStore();
@@ -33,9 +46,9 @@ export function useApplyFilters() {
         visible = false;
       }
 
-      // Label filter (exclude if node has ANY of the excluded labels)
+      // Label filter (exclude if node has ANY of the excluded labels, hierarchical)
       if (visible && excludedLabels.length > 0) {
-        const hasExcludedLabel = attrs.labels.some((l) => excludedLabels.includes(l));
+        const hasExcludedLabel = attrs.labels.some((l) => isLabelExcluded(l, excludedLabels));
         if (hasExcludedLabel) visible = false;
       }
 
