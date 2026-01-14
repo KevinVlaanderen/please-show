@@ -3,27 +3,24 @@ import { useAppStore } from '../stores/appStore';
 import { useFilterStore } from '../stores/filterStore';
 
 /**
- * Check if a package matches any of the selected packages.
- * Handles hierarchical matching: selecting "src" matches "src", "src/cli", "src/build", etc.
+ * Check if a package is excluded by any of the excluded packages.
+ * Handles hierarchical matching: excluding "src" also excludes "src/cli", "src/build", etc.
  */
-function matchesPackageFilter(nodePackage: string, selectedPackages: string[]): boolean {
-  return selectedPackages.some((selected) => {
-    if (nodePackage === selected) return true;
-    // Check if nodePackage is a child of selected (e.g., "src/cli" is child of "src")
-    if (nodePackage.startsWith(selected + '/')) return true;
+function isPackageExcluded(nodePackage: string, excludedPackages: string[]): boolean {
+  return excludedPackages.some((excluded) => {
+    if (nodePackage === excluded) return true;
+    // Check if nodePackage is a child of excluded (e.g., "src/cli" is child of "src")
+    if (nodePackage.startsWith(excluded + '/')) return true;
     return false;
   });
 }
 
 export function useApplyFilters() {
   const graph = useAppStore((state) => state.graph);
-  const { selectedPackages, selectedLabels, showBinaryOnly } = useFilterStore();
+  const { excludedPackages, excludedLabels, showBinaryOnly } = useFilterStore();
 
   useEffect(() => {
     if (!graph) return;
-
-    const hasPackageFilter = selectedPackages.length > 0;
-    const hasLabelFilter = selectedLabels.length > 0;
 
     // Determine which nodes should be visible
     const visibleNodes = new Set<string>();
@@ -31,15 +28,15 @@ export function useApplyFilters() {
     graph.forEachNode((nodeId, attrs) => {
       let visible = true;
 
-      // Package filter (hierarchical)
-      if (hasPackageFilter && !matchesPackageFilter(attrs.package, selectedPackages)) {
+      // Package filter (exclusion-based, hierarchical)
+      if (isPackageExcluded(attrs.package, excludedPackages)) {
         visible = false;
       }
 
-      // Label filter (must have at least one matching label)
-      if (visible && hasLabelFilter) {
-        const hasMatch = attrs.labels.some((l) => selectedLabels.includes(l));
-        if (!hasMatch) visible = false;
+      // Label filter (exclude if node has ANY of the excluded labels)
+      if (visible && excludedLabels.length > 0) {
+        const hasExcludedLabel = attrs.labels.some((l) => excludedLabels.includes(l));
+        if (hasExcludedLabel) visible = false;
       }
 
       // Binary filter
@@ -56,5 +53,5 @@ export function useApplyFilters() {
       const hidden = !visibleNodes.has(source) || !visibleNodes.has(target);
       graph.setEdgeAttribute(edgeId, 'hidden', hidden);
     });
-  }, [graph, selectedPackages, selectedLabels, showBinaryOnly]);
+  }, [graph, excludedPackages, excludedLabels, showBinaryOnly]);
 }

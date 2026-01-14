@@ -5,8 +5,8 @@ export function FilterPanel() {
   const packages = useAppStore((state) => state.packages);
   const labels = useAppStore((state) => state.labels);
   const {
-    selectedPackages,
-    selectedLabels,
+    excludedPackages,
+    excludedLabels,
     showBinaryOnly,
     togglePackage,
     toggleLabel,
@@ -14,7 +14,7 @@ export function FilterPanel() {
     clearFilters,
   } = useFilterStore();
 
-  const hasFilters = selectedPackages.length > 0 || selectedLabels.length > 0 || showBinaryOnly;
+  const hasFilters = excludedPackages.length > 0 || excludedLabels.length > 0 || showBinaryOnly;
 
   return (
     <div className="p-3 space-y-4">
@@ -45,7 +45,7 @@ export function FilterPanel() {
       <FilterSection
         title="Packages"
         items={packages.map((p) => ({ id: p, label: p || '(root)' }))}
-        selected={selectedPackages}
+        excluded={excludedPackages}
         onToggle={togglePackage}
       />
 
@@ -54,7 +54,7 @@ export function FilterPanel() {
         <FilterSection
           title="Labels"
           items={labels.map((l) => ({ id: l, label: l }))}
-          selected={selectedLabels}
+          excluded={excludedLabels}
           onToggle={toggleLabel}
         />
       )}
@@ -65,19 +65,21 @@ export function FilterPanel() {
 interface FilterSectionProps {
   title: string;
   items: { id: string; label: string }[];
-  selected: string[];
+  excluded: string[];
   onToggle: (id: string) => void;
 }
 
-function FilterSection({ title, items, selected, onToggle }: FilterSectionProps) {
+function FilterSection({ title, items, excluded, onToggle }: FilterSectionProps) {
   if (items.length === 0) return null;
+
+  const hiddenCount = excluded.length;
 
   return (
     <div>
       <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
         {title}
-        {selected.length > 0 && (
-          <span className="ml-1 text-indigo-600">({selected.length})</span>
+        {hiddenCount > 0 && (
+          <span className="ml-1 text-red-600">({hiddenCount} hidden)</span>
         )}
       </h4>
       <div className="max-h-40 overflow-y-auto space-y-1">
@@ -88,7 +90,7 @@ function FilterSection({ title, items, selected, onToggle }: FilterSectionProps)
           >
             <input
               type="checkbox"
-              checked={selected.includes(item.id)}
+              checked={!excluded.includes(item.id)}
               onChange={() => onToggle(item.id)}
               className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />

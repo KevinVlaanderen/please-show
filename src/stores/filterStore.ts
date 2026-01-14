@@ -1,49 +1,49 @@
 import { create } from 'zustand';
 
 interface FilterState {
-  // Active filters
-  selectedPackages: string[];
-  selectedLabels: string[];
+  // Excluded items (exclusion-based filtering)
+  excludedPackages: string[];
+  excludedLabels: string[];
   showBinaryOnly: boolean;
 
   // Actions
-  setSelectedPackages: (packages: string[]) => void;
+  setExcludedPackages: (packages: string[]) => void;
   togglePackage: (pkg: string) => void;
-  setSelectedLabels: (labels: string[]) => void;
+  setExcludedLabels: (labels: string[]) => void;
   toggleLabel: (label: string) => void;
   setShowBinaryOnly: (show: boolean) => void;
   clearFilters: () => void;
 }
 
 export const useFilterStore = create<FilterState>((set) => ({
-  selectedPackages: [],
-  selectedLabels: [],
+  excludedPackages: [],
+  excludedLabels: [],
   showBinaryOnly: false,
 
-  setSelectedPackages: (packages) => set({ selectedPackages: packages }),
+  setExcludedPackages: (packages) => set({ excludedPackages: packages }),
 
   togglePackage: (pkg) =>
     set((state) => ({
-      selectedPackages: state.selectedPackages.includes(pkg)
-        ? state.selectedPackages.filter((p) => p !== pkg)
-        : [...state.selectedPackages, pkg],
+      excludedPackages: state.excludedPackages.includes(pkg)
+        ? state.excludedPackages.filter((p) => p !== pkg)
+        : [...state.excludedPackages, pkg],
     })),
 
-  setSelectedLabels: (labels) => set({ selectedLabels: labels }),
+  setExcludedLabels: (labels) => set({ excludedLabels: labels }),
 
   toggleLabel: (label) =>
     set((state) => ({
-      selectedLabels: state.selectedLabels.includes(label)
-        ? state.selectedLabels.filter((l) => l !== label)
-        : [...state.selectedLabels, label],
+      excludedLabels: state.excludedLabels.includes(label)
+        ? state.excludedLabels.filter((l) => l !== label)
+        : [...state.excludedLabels, label],
     })),
 
   setShowBinaryOnly: (show) => set({ showBinaryOnly: show }),
 
   clearFilters: () =>
     set({
-      selectedPackages: [],
-      selectedLabels: [],
+      excludedPackages: [],
+      excludedLabels: [],
       showBinaryOnly: false,
     }),
 }));
