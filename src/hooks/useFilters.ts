@@ -2,6 +2,19 @@ import { useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useFilterStore } from '../stores/filterStore';
 
+/**
+ * Check if a package matches any of the selected packages.
+ * Handles hierarchical matching: selecting "src" matches "src", "src/cli", "src/build", etc.
+ */
+function matchesPackageFilter(nodePackage: string, selectedPackages: string[]): boolean {
+  return selectedPackages.some((selected) => {
+    if (nodePackage === selected) return true;
+    // Check if nodePackage is a child of selected (e.g., "src/cli" is child of "src")
+    if (nodePackage.startsWith(selected + '/')) return true;
+    return false;
+  });
+}
+
 export function useApplyFilters() {
   const graph = useAppStore((state) => state.graph);
   const { selectedPackages, selectedLabels, showBinaryOnly } = useFilterStore();
@@ -18,8 +31,8 @@ export function useApplyFilters() {
     graph.forEachNode((nodeId, attrs) => {
       let visible = true;
 
-      // Package filter
-      if (hasPackageFilter && !selectedPackages.includes(attrs.package)) {
+      // Package filter (hierarchical)
+      if (hasPackageFilter && !matchesPackageFilter(attrs.package, selectedPackages)) {
         visible = false;
       }
 
