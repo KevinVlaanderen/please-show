@@ -77,8 +77,6 @@ interface GraphCanvasProps {
 
 export function GraphCanvas({ className }: GraphCanvasProps) {
   const graph = useAppStore((state) => state.graph);
-  const selectedNodeId = useUIStore((state) => state.selectedNodeId);
-  const highlightedPath = useUIStore((state) => state.highlightedPath);
 
   if (!graph) {
     return (
@@ -105,17 +103,6 @@ export function GraphCanvas({ className }: GraphCanvasProps) {
         renderEdgeLabels: false,
         enableEdgeEvents: false,
         zoomDuration: 200,
-        nodeReducer: (node, data) => {
-          const isSelected = node === selectedNodeId;
-          const isInPath = highlightedPath.includes(node);
-
-          return {
-            ...data,
-            size: isSelected ? data.size * 1.5 : data.size,
-            color: isInPath ? '#dc2626' : data.color,
-            zIndex: isSelected || isInPath ? 1 : 0,
-          };
-        },
       }}
     >
       <GraphEvents />

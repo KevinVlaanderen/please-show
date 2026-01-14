@@ -8,6 +8,7 @@ import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
 import { useApplyFilters } from './hooks/useFilters';
 import { useApplyColorScheme } from './hooks/useColorScheme';
+import { useApplyHighlights } from './hooks/useHighlights';
 import { applyLayout } from './lib/graph/layout';
 
 function App() {
@@ -17,9 +18,10 @@ function App() {
   const clearData = useAppStore((state) => state.clearData);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
 
-  // Apply filters and colors to graph
+  // Apply filters, colors, and highlights to graph
   useApplyFilters();
   useApplyColorScheme();
+  useApplyHighlights();
 
   // Apply layout when graph changes
   useEffect(() => {
