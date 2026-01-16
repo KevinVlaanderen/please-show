@@ -12,6 +12,8 @@ export function useApplyLayout() {
   const clusterByPackage = useLayoutStore((state) => state.clusterByPackage);
   const clusteringStrength = useLayoutStore((state) => state.clusteringStrength);
   const layoutVersion = useLayoutStore((state) => state.layoutVersion);
+  const layoutQuality = useLayoutStore((state) => state.layoutQuality);
+  const dissuadeHubs = useLayoutStore((state) => state.dissuadeHubs);
 
   // Track which graph we've applied layout to
   const graphRef = useRef(graph);
@@ -40,8 +42,9 @@ export function useApplyLayout() {
       : 'forceAtlas2';
 
     applyLayout(graph, algorithm, {
-      iterations: 100,
       clusteringStrength,
+      quality: layoutQuality,
+      dissuadeHubs,
     });
-  }, [graph, clusterByPackage, clusteringStrength, layoutVersion]);
+  }, [graph, clusterByPackage, clusteringStrength, layoutVersion, layoutQuality, dissuadeHubs]);
 }

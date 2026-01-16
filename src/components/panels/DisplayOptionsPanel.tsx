@@ -1,5 +1,5 @@
 import { useDisplayStore, type ColorScheme } from '../../stores/displayStore';
-import { useLayoutStore, type ClusteringStrength } from '../../stores/layoutStore';
+import { useLayoutStore, type ClusteringStrength, type LayoutQuality } from '../../stores/layoutStore';
 
 const COLOR_SCHEMES: { value: ColorScheme; label: string; description: string }[] = [
   { value: 'package', label: 'By Package', description: 'Color nodes by their package path' },
@@ -12,6 +12,12 @@ const CLUSTERING_OPTIONS: { value: ClusteringStrength; label: string }[] = [
   { value: 'strong', label: 'Tight clustering' },
 ];
 
+const LAYOUT_QUALITY_OPTIONS: { value: LayoutQuality; label: string }[] = [
+  { value: 'fast', label: 'Fast' },
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'quality', label: 'High Quality' },
+];
+
 export function DisplayOptionsPanel() {
   const colorScheme = useDisplayStore((state) => state.colorScheme);
   const setColorScheme = useDisplayStore((state) => state.setColorScheme);
@@ -22,6 +28,10 @@ export function DisplayOptionsPanel() {
   const triggerRelayout = useLayoutStore((state) => state.triggerRelayout);
   const showHulls = useLayoutStore((state) => state.showHulls);
   const setShowHulls = useLayoutStore((state) => state.setShowHulls);
+  const layoutQuality = useLayoutStore((state) => state.layoutQuality);
+  const setLayoutQuality = useLayoutStore((state) => state.setLayoutQuality);
+  const dissuadeHubs = useLayoutStore((state) => state.dissuadeHubs);
+  const setDissuadeHubs = useLayoutStore((state) => state.setDissuadeHubs);
 
   return (
     <div className="p-3 border-t border-slate-200">
@@ -98,9 +108,43 @@ export function DisplayOptionsPanel() {
           <span className="text-sm text-slate-700">Show cluster hulls</span>
         </label>
 
+        <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 mt-2">
+          <input
+            type="checkbox"
+            checked={dissuadeHubs}
+            onChange={(e) => setDissuadeHubs(e.target.checked)}
+            className="text-indigo-600 focus:ring-indigo-500 rounded"
+          />
+          <span className="text-sm text-slate-700">Spread out hubs</span>
+        </label>
+
+        <div className="mt-3">
+          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+            Layout Quality
+          </h4>
+          <div className="space-y-1">
+            {LAYOUT_QUALITY_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1"
+              >
+                <input
+                  type="radio"
+                  name="layoutQuality"
+                  value={option.value}
+                  checked={layoutQuality === option.value}
+                  onChange={() => setLayoutQuality(option.value)}
+                  className="text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-slate-700">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <button
           onClick={triggerRelayout}
-          className="mt-2 w-full px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md border border-slate-200"
+          className="mt-3 w-full px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md border border-slate-200"
         >
           Re-apply Layout
         </button>

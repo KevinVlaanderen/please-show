@@ -2,14 +2,22 @@ import Graph from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import { circular } from 'graphology-layout';
 import type { GraphNodeAttributes, GraphEdgeAttributes } from '../../types/graph';
-import type { ClusteringStrength } from '../../stores/layoutStore';
+import type { ClusteringStrength, LayoutQuality } from '../../stores/layoutStore';
 
 export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'circular' | 'random';
 
 interface LayoutOptions {
   iterations?: number;
   clusteringStrength?: ClusteringStrength;
+  quality?: LayoutQuality;
+  dissuadeHubs?: boolean;
 }
+
+const qualityPresets = {
+  fast: { iterations: 75, barnesHutTheta: 0.6 },
+  balanced: { iterations: 150, barnesHutTheta: 0.4 },
+  quality: { iterations: 250, barnesHutTheta: 0.3 },
+};
 
 interface PackageInfo {
   nodes: string[];
@@ -27,7 +35,13 @@ function applyClusteredForceAtlas2(
   graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
   options: LayoutOptions = {}
 ): void {
-  const { iterations = 100, clusteringStrength = 'weak' } = options;
+  const {
+    clusteringStrength = 'weak',
+    quality = 'balanced',
+    dissuadeHubs = true,
+  } = options;
+  const preset = qualityPresets[quality];
+  const iterations = options.iterations ?? preset.iterations;
 
   // Group nodes by package
   const packageNodes = new Map<string, string[]>();
@@ -75,7 +89,7 @@ function applyClusteredForceAtlas2(
   }
 
   // Run ForceAtlas2 on the meta-graph to position packages
-  const metaIterations = Math.max(50, iterations);
+  const metaIterations = Math.max(75, Math.round(iterations * 0.75));
   forceAtlas2.assign(metaGraph, {
     iterations: metaIterations,
     settings: {
@@ -84,9 +98,11 @@ function applyClusteredForceAtlas2(
       strongGravityMode: false,
       linLogMode: true,
       barnesHutOptimize: packages.length > 50,
+      barnesHutTheta: preset.barnesHutTheta,
       adjustSizes: true,
       edgeWeightInfluence: 1,
       slowDown: 1,
+      outboundAttractionDistribution: dissuadeHubs,
     },
   });
 
@@ -141,14 +157,15 @@ function applyClusteredForceAtlas2(
     if (subgraph.size > 0) {
       // Has internal edges - use force-directed layout
       forceAtlas2.assign(subgraph, {
-        iterations: Math.round(iterations * 0.5),
+        iterations: Math.round(iterations * 0.6),
         settings: {
           gravity: 1,
           scalingRatio: 10,
           strongGravityMode: true,
-          linLogMode: false,
+          linLogMode: true,
           adjustSizes: true,
           slowDown: 2,
+          outboundAttractionDistribution: dissuadeHubs,
         },
       });
     } else {
@@ -224,7 +241,9 @@ export function applyForceAtlas2(
   graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
   options: LayoutOptions = {}
 ): void {
-  const { iterations = 100 } = options;
+  const { quality = 'balanced', dissuadeHubs = true } = options;
+  const preset = qualityPresets[quality];
+  const iterations = options.iterations ?? preset.iterations;
 
   forceAtlas2.assign(graph, {
     iterations,
@@ -233,10 +252,10 @@ export function applyForceAtlas2(
       scalingRatio: 10,
       strongGravityMode: false,
       barnesHutOptimize: graph.order > 500,
-      barnesHutTheta: 0.5,
+      barnesHutTheta: preset.barnesHutTheta,
       adjustSizes: true,
-      linLogMode: false,
-      outboundAttractionDistribution: false,
+      linLogMode: true,
+      outboundAttractionDistribution: dissuadeHubs,
       edgeWeightInfluence: 1,
       slowDown: 1,
     },
