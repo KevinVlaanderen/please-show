@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { SigmaContainer, useRegisterEvents, useSigma } from '@react-sigma/core';
 import '@react-sigma/core/lib/style.css';
+import EdgeCurveProgram from '@sigma/edge-curve';
+import { EdgeLineProgram } from 'sigma/rendering';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import { GraphControls } from './GraphControls';
@@ -79,6 +81,15 @@ interface GraphCanvasProps {
 export function GraphCanvas({ className }: GraphCanvasProps) {
   const graph = useAppStore((state) => state.graph);
 
+  // Memoize edge program classes to prevent unnecessary re-renders
+  const edgeProgramClasses = useMemo(
+    () => ({
+      line: EdgeLineProgram,
+      curved: EdgeCurveProgram,
+    }),
+    []
+  );
+
   if (!graph) {
     return (
       <div className={`flex items-center justify-center bg-slate-100 ${className}`}>
@@ -96,6 +107,8 @@ export function GraphCanvas({ className }: GraphCanvasProps) {
         allowInvalidContainer: true,
         defaultNodeColor: '#6366f1',
         defaultEdgeColor: '#94a3b8',
+        defaultEdgeType: 'curved',
+        edgeProgramClasses,
         labelFont: 'system-ui, sans-serif',
         labelSize: 12,
         labelWeight: 'normal',

@@ -10,12 +10,14 @@ interface LayoutState {
   showHulls: boolean;
   layoutQuality: LayoutQuality;
   dissuadeHubs: boolean;
+  edgeBundling: boolean;
   setClusterByPackage: (enabled: boolean) => void;
   setClusteringStrength: (strength: ClusteringStrength) => void;
   triggerRelayout: () => void;
   setShowHulls: (show: boolean) => void;
   setLayoutQuality: (quality: LayoutQuality) => void;
   setDissuadeHubs: (enabled: boolean) => void;
+  setEdgeBundling: (enabled: boolean) => void;
 }
 
 export const useLayoutStore = create<LayoutState>((set) => ({
@@ -25,10 +27,12 @@ export const useLayoutStore = create<LayoutState>((set) => ({
   showHulls: false,
   layoutQuality: 'balanced',
   dissuadeHubs: true,
+  edgeBundling: true,
   setClusterByPackage: (enabled) => set({ clusterByPackage: enabled }),
   setClusteringStrength: (strength) => set({ clusteringStrength: strength }),
   triggerRelayout: () => set((state) => ({ layoutVersion: state.layoutVersion + 1 })),
   setShowHulls: (show) => set({ showHulls: show }),
   setLayoutQuality: (quality) => set({ layoutQuality: quality }),
   setDissuadeHubs: (enabled) => set({ dissuadeHubs: enabled }),
+  setEdgeBundling: (enabled) => set({ edgeBundling: enabled }),
 }));

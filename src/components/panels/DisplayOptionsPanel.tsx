@@ -32,6 +32,8 @@ export function DisplayOptionsPanel() {
   const setLayoutQuality = useLayoutStore((state) => state.setLayoutQuality);
   const dissuadeHubs = useLayoutStore((state) => state.dissuadeHubs);
   const setDissuadeHubs = useLayoutStore((state) => state.setDissuadeHubs);
+  const edgeBundling = useLayoutStore((state) => state.edgeBundling);
+  const setEdgeBundling = useLayoutStore((state) => state.setEdgeBundling);
 
   return (
     <div className="p-3 border-t border-slate-200">
@@ -106,6 +108,16 @@ export function DisplayOptionsPanel() {
             className="text-indigo-600 focus:ring-indigo-500 rounded"
           />
           <span className="text-sm text-slate-700">Show cluster hulls</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 mt-2">
+          <input
+            type="checkbox"
+            checked={edgeBundling}
+            onChange={(e) => setEdgeBundling(e.target.checked)}
+            className="text-indigo-600 focus:ring-indigo-500 rounded"
+          />
+          <span className="text-sm text-slate-700">Curve edges</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 mt-2">

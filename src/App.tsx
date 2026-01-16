@@ -10,6 +10,7 @@ import { useApplyFilters } from './hooks/useFilters';
 import { useApplyColorScheme } from './hooks/useColorScheme';
 import { useApplyHighlights } from './hooks/useHighlights';
 import { useApplyLayout } from './hooks/useLayout';
+import { useApplyEdgeBundling } from './hooks/useEdgeBundling';
 
 function App() {
   const graph = useAppStore((state) => state.graph);
@@ -18,11 +19,12 @@ function App() {
   const clearData = useAppStore((state) => state.clearData);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
 
-  // Apply filters, colors, highlights, and layout to graph
+  // Apply filters, colors, highlights, layout, and edge bundling to graph
   useApplyFilters();
   useApplyColorScheme();
   useApplyHighlights();
   useApplyLayout();
+  useApplyEdgeBundling();
 
   return (
     <div className="h-screen flex flex-col bg-slate-50">
