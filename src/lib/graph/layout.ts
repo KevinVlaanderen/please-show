@@ -11,112 +11,17 @@ interface LayoutOptions {
   clusteringStrength?: ClusteringStrength;
 }
 
-interface PackagePosition {
+interface PackageInfo {
+  nodes: string[];
   centerX: number;
   centerY: number;
   radius: number;
 }
 
 /**
- * Calculate positions for packages based on hierarchy
- * Root packages are arranged in a circle, child packages are positioned near their parents
- */
-function calculatePackagePositions(
-  packages: string[],
-  scale: number = 1000
-): Map<string, PackagePosition> {
-  const positions = new Map<string, PackagePosition>();
-
-  // Build hierarchy: find root packages and map parents to children
-  const rootPackages = packages.filter((p) => !p.includes('/'));
-  const childMap = new Map<string, string[]>();
-
-  packages.forEach((pkg) => {
-    const parts = pkg.split('/');
-    if (parts.length > 1) {
-      const parent = parts.slice(0, -1).join('/');
-      if (!childMap.has(parent)) childMap.set(parent, []);
-      childMap.get(parent)!.push(pkg);
-    }
-  });
-
-  // Position root packages in a circle (increased spacing for hull visibility)
-  const angleStep = (2 * Math.PI) / Math.max(rootPackages.length, 1);
-  rootPackages.forEach((pkg, i) => {
-    const angle = i * angleStep;
-    positions.set(pkg, {
-      centerX: Math.cos(angle) * scale * 0.6,
-      centerY: Math.sin(angle) * scale * 0.6,
-      radius: scale * 0.25,
-    });
-  });
-
-  // Recursively position child packages near their parents
-  function positionChildren(parent: string) {
-    const children = childMap.get(parent) || [];
-    const parentPos = positions.get(parent);
-    if (!parentPos || children.length === 0) return;
-
-    const childRadius = parentPos.radius * 0.5;
-    const childAngleStep = (2 * Math.PI) / children.length;
-
-    children.forEach((child, i) => {
-      const angle = i * childAngleStep;
-      const offset = parentPos.radius * 0.6;
-      positions.set(child, {
-        centerX: parentPos.centerX + Math.cos(angle) * offset,
-        centerY: parentPos.centerY + Math.sin(angle) * offset,
-        radius: childRadius,
-      });
-      positionChildren(child);
-    });
-  }
-
-  rootPackages.forEach((pkg) => positionChildren(pkg));
-
-  // Handle packages that weren't positioned (orphans with missing parent chain)
-  packages.forEach((pkg) => {
-    if (!positions.has(pkg)) {
-      positions.set(pkg, {
-        centerX: (Math.random() - 0.5) * scale,
-        centerY: (Math.random() - 0.5) * scale,
-        radius: scale * 0.1,
-      });
-    }
-  });
-
-  return positions;
-}
-
-/**
- * Pre-position nodes by package with jitter
- */
-function prePositionByPackage(
-  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
-  strength: ClusteringStrength = 'weak'
-): void {
-  const packages = new Set<string>();
-  graph.forEachNode((_, attrs) => packages.add(attrs.package));
-
-  const packagePositions = calculatePackagePositions(Array.from(packages));
-
-  graph.forEachNode((nodeId, attrs) => {
-    const pos = packagePositions.get(attrs.package);
-    if (pos) {
-      // Tighter jitter for strong clustering
-      const jitterScale = strength === 'strong' ? 0.3 : 0.8;
-      const jitterX = (Math.random() - 0.5) * pos.radius * jitterScale;
-      const jitterY = (Math.random() - 0.5) * pos.radius * jitterScale;
-
-      graph.setNodeAttribute(nodeId, 'x', pos.centerX + jitterX);
-      graph.setNodeAttribute(nodeId, 'y', pos.centerY + jitterY);
-    }
-  });
-}
-
-/**
- * Apply ForceAtlas2 with package clustering
- * Pre-positions nodes by package, then runs ForceAtlas2 with settings that preserve grouping
+ * Two-phase clustered layout:
+ * 1. Create a meta-graph of packages and position them using ForceAtlas2
+ * 2. Arrange nodes within each package, then translate to package position
  */
 function applyClusteredForceAtlas2(
   graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
@@ -124,39 +29,191 @@ function applyClusteredForceAtlas2(
 ): void {
   const { iterations = 100, clusteringStrength = 'weak' } = options;
 
-  // Step 1: Pre-position nodes by package
-  prePositionByPackage(graph, clusteringStrength);
-
-  // Step 2: Run ForceAtlas2 with adjusted settings
-  const settings =
-    clusteringStrength === 'strong'
-      ? {
-          gravity: 3,
-          scalingRatio: 5,
-          strongGravityMode: true,
-          linLogMode: true,
-          barnesHutOptimize: graph.order > 500,
-          barnesHutTheta: 0.5,
-          adjustSizes: true,
-          edgeWeightInfluence: 1,
-          slowDown: 2,
-        }
-      : {
-          gravity: 2,
-          scalingRatio: 8,
-          strongGravityMode: false,
-          linLogMode: false,
-          barnesHutOptimize: graph.order > 500,
-          barnesHutTheta: 0.5,
-          adjustSizes: true,
-          edgeWeightInfluence: 1,
-          slowDown: 1,
-        };
-
-  forceAtlas2.assign(graph, {
-    iterations: clusteringStrength === 'strong' ? Math.round(iterations * 0.5) : iterations,
-    settings,
+  // Group nodes by package
+  const packageNodes = new Map<string, string[]>();
+  graph.forEachNode((nodeId, attrs) => {
+    const nodes = packageNodes.get(attrs.package) || [];
+    nodes.push(nodeId);
+    packageNodes.set(attrs.package, nodes);
   });
+
+  const packages = Array.from(packageNodes.keys());
+  if (packages.length === 0) return;
+
+  // ============================================
+  // PHASE 1: Position packages using meta-graph
+  // ============================================
+
+  // Create meta-graph where each package is a node
+  const metaGraph = new Graph({ type: 'undirected' });
+
+  // Add package nodes, sized by number of nodes they contain
+  for (const [pkg, nodes] of packageNodes) {
+    metaGraph.addNode(pkg, {
+      x: Math.random() * 1000,
+      y: Math.random() * 1000,
+      size: Math.sqrt(nodes.length) * 10,
+    });
+  }
+
+  // Add edges between packages that have dependencies
+  const packageEdges = new Map<string, number>();
+  graph.forEachEdge((_, __, source, target) => {
+    const sourcePkg = graph.getNodeAttribute(source, 'package');
+    const targetPkg = graph.getNodeAttribute(target, 'package');
+    if (sourcePkg !== targetPkg) {
+      const key = [sourcePkg, targetPkg].sort().join('|||');
+      packageEdges.set(key, (packageEdges.get(key) || 0) + 1);
+    }
+  });
+
+  for (const [key, weight] of packageEdges) {
+    const [pkg1, pkg2] = key.split('|||');
+    if (!metaGraph.hasEdge(pkg1, pkg2)) {
+      metaGraph.addEdge(pkg1, pkg2, { weight });
+    }
+  }
+
+  // Run ForceAtlas2 on the meta-graph to position packages
+  const metaIterations = Math.max(50, iterations);
+  forceAtlas2.assign(metaGraph, {
+    iterations: metaIterations,
+    settings: {
+      gravity: 0.5,
+      scalingRatio: 50,
+      strongGravityMode: false,
+      linLogMode: true,
+      barnesHutOptimize: packages.length > 50,
+      adjustSizes: true,
+      edgeWeightInfluence: 1,
+      slowDown: 1,
+    },
+  });
+
+  // Extract package positions and calculate appropriate radii
+  const packageInfo = new Map<string, PackageInfo>();
+  const baseRadius = clusteringStrength === 'strong' ? 80 : 120;
+
+  for (const [pkg, nodes] of packageNodes) {
+    const x = metaGraph.getNodeAttribute(pkg, 'x');
+    const y = metaGraph.getNodeAttribute(pkg, 'y');
+    // Radius based on number of nodes, but capped
+    const radius = baseRadius * Math.sqrt(Math.max(1, nodes.length / 3));
+    packageInfo.set(pkg, { nodes, centerX: x, centerY: y, radius });
+  }
+
+  // ============================================
+  // PHASE 2: Arrange nodes within each package
+  // ============================================
+
+  for (const [, info] of packageInfo) {
+    const { nodes, centerX, centerY, radius } = info;
+
+    if (nodes.length === 1) {
+      // Single node - place at center
+      graph.setNodeAttribute(nodes[0], 'x', centerX);
+      graph.setNodeAttribute(nodes[0], 'y', centerY);
+      continue;
+    }
+
+    // Create a subgraph for this package's internal edges
+    const subgraph = new Graph({ type: 'directed' });
+    const nodeSet = new Set(nodes);
+
+    for (const nodeId of nodes) {
+      subgraph.addNode(nodeId, {
+        x: Math.random() * radius * 2 - radius,
+        y: Math.random() * radius * 2 - radius,
+        size: graph.getNodeAttribute(nodeId, 'size') || 5,
+      });
+    }
+
+    // Add only internal edges (within the package)
+    for (const nodeId of nodes) {
+      graph.forEachOutEdge(nodeId, (_, __, _source, target) => {
+        if (nodeSet.has(target) && !subgraph.hasEdge(nodeId, target)) {
+          subgraph.addEdge(nodeId, target);
+        }
+      });
+    }
+
+    // Run a light ForceAtlas2 on the subgraph
+    if (subgraph.size > 0) {
+      // Has internal edges - use force-directed layout
+      forceAtlas2.assign(subgraph, {
+        iterations: Math.round(iterations * 0.5),
+        settings: {
+          gravity: 1,
+          scalingRatio: 10,
+          strongGravityMode: true,
+          linLogMode: false,
+          adjustSizes: true,
+          slowDown: 2,
+        },
+      });
+    } else {
+      // No internal edges - arrange in a circle or grid
+      if (nodes.length <= 8) {
+        // Circle for small groups
+        const angleStep = (2 * Math.PI) / nodes.length;
+        nodes.forEach((nodeId, i) => {
+          const angle = i * angleStep - Math.PI / 2;
+          const r = radius * 0.5;
+          subgraph.setNodeAttribute(nodeId, 'x', Math.cos(angle) * r);
+          subgraph.setNodeAttribute(nodeId, 'y', Math.sin(angle) * r);
+        });
+      } else {
+        // Grid for larger groups
+        const cols = Math.ceil(Math.sqrt(nodes.length));
+        const spacing = (radius * 1.5) / cols;
+        nodes.forEach((nodeId, i) => {
+          const row = Math.floor(i / cols);
+          const col = i % cols;
+          const totalRows = Math.ceil(nodes.length / cols);
+          subgraph.setNodeAttribute(
+            nodeId,
+            'x',
+            (col - (cols - 1) / 2) * spacing
+          );
+          subgraph.setNodeAttribute(
+            nodeId,
+            'y',
+            (row - (totalRows - 1) / 2) * spacing
+          );
+        });
+      }
+    }
+
+    // Normalize positions to fit within the package radius
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    subgraph.forEachNode((nodeId) => {
+      const x = subgraph.getNodeAttribute(nodeId, 'x');
+      const y = subgraph.getNodeAttribute(nodeId, 'y');
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    });
+
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
+    const scale = Math.min(radius / (rangeX / 2 + 20), radius / (rangeY / 2 + 20), 1);
+
+    // Apply positions to main graph, centered on package position
+    subgraph.forEachNode((nodeId) => {
+      const localX = subgraph.getNodeAttribute(nodeId, 'x');
+      const localY = subgraph.getNodeAttribute(nodeId, 'y');
+
+      // Center and scale, then translate to package position
+      const normalizedX = (localX - (minX + maxX) / 2) * scale;
+      const normalizedY = (localY - (minY + maxY) / 2) * scale;
+
+      graph.setNodeAttribute(nodeId, 'x', centerX + normalizedX);
+      graph.setNodeAttribute(nodeId, 'y', centerY + normalizedY);
+    });
+  }
 }
 
 /**
