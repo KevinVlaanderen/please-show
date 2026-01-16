@@ -51,14 +51,23 @@ export function FilterPanel() {
   const {
     excludedPackages,
     excludedLabels,
+    includedPackages,
+    includedLabels,
     showBinaryOnly,
     togglePackage,
     toggleLabel,
+    togglePackageInclude,
+    toggleLabelInclude,
     setShowBinaryOnly,
     clearFilters,
   } = useFilterStore();
 
-  const hasFilters = excludedPackages.length > 0 || excludedLabels.length > 0 || showBinaryOnly;
+  const hasFilters =
+    excludedPackages.length > 0 ||
+    excludedLabels.length > 0 ||
+    includedPackages.length > 0 ||
+    includedLabels.length > 0 ||
+    showBinaryOnly;
 
   const packageTree = useMemo(() => buildTree(packages, '/'), [packages]);
   const labelTree = useMemo(() => buildTree(labels, ':'), [labels]);
@@ -100,7 +109,9 @@ export function FilterPanel() {
           <HierarchicalTreeView
             node={packageTree}
             excluded={excludedPackages}
+            included={includedPackages}
             onToggle={togglePackage}
+            onToggleInclude={togglePackageInclude}
             separator="/"
             depth={0}
           />
@@ -120,7 +131,9 @@ export function FilterPanel() {
             <HierarchicalTreeView
               node={labelTree}
               excluded={excludedLabels}
+              included={includedLabels}
               onToggle={toggleLabel}
+              onToggleInclude={toggleLabelInclude}
               separator=":"
               depth={0}
             />
@@ -134,22 +147,43 @@ export function FilterPanel() {
 interface HierarchicalTreeViewProps {
   node: TreeNode;
   excluded: string[];
+  included: string[];
   onToggle: (item: string) => void;
+  onToggleInclude: (item: string) => void;
   separator: string;
   depth: number;
 }
 
-function HierarchicalTreeView({ node, excluded, onToggle, separator, depth }: HierarchicalTreeViewProps) {
+function HierarchicalTreeView({
+  node,
+  excluded,
+  included,
+  onToggle,
+  onToggleInclude,
+  separator,
+  depth,
+}: HierarchicalTreeViewProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const isExcluded = (path: string) => excluded.includes(path);
 
-  // Check if any ancestor is excluded (making this node effectively hidden)
+  // Check if any ancestor is excluded (making this node hidden unless explicitly included)
   const isAncestorExcluded = (path: string) => {
     const parts = path.split(separator);
     for (let i = 1; i < parts.length; i++) {
       const ancestorPath = parts.slice(0, i).join(separator);
       if (excluded.includes(ancestorPath)) return true;
+    }
+    return false;
+  };
+
+  // Check if this item or any ancestor is explicitly included
+  const isOrAncestorIncluded = (path: string) => {
+    if (included.includes(path)) return true;
+    const parts = path.split(separator);
+    for (let i = 1; i < parts.length; i++) {
+      const ancestorPath = parts.slice(0, i).join(separator);
+      if (included.includes(ancestorPath)) return true;
     }
     return false;
   };
@@ -189,7 +223,24 @@ function HierarchicalTreeView({ node, excluded, onToggle, separator, depth }: Hi
       {sortedChildren.map((child) => {
         const hasChildren = child.children.size > 0;
         const isCollapsed = collapsed.has(child.fullPath);
-        const ancestorHidden = isAncestorExcluded(child.fullPath);
+        const ancestorExcluded = isAncestorExcluded(child.fullPath);
+        const selfOrAncestorIncluded = isOrAncestorIncluded(child.fullPath);
+
+        // Determine if this item is visible
+        // Visible if: not excluded, OR if ancestor is excluded but we're explicitly included
+        const isVisible = ancestorExcluded
+          ? selfOrAncestorIncluded
+          : !isExcluded(child.fullPath);
+
+        // When ancestor is excluded, toggling affects the include list
+        // Otherwise, toggling affects the exclude list
+        const handleToggle = () => {
+          if (ancestorExcluded) {
+            onToggleInclude(child.fullPath);
+          } else {
+            onToggle(child.fullPath);
+          }
+        };
 
         return (
           <div key={child.fullPath} style={{ marginLeft: depth > 0 ? 12 : 0 }}>
@@ -219,14 +270,13 @@ function HierarchicalTreeView({ node, excluded, onToggle, separator, depth }: Hi
               {/* Checkbox and label */}
               <label
                 className={`flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-0.5 flex-1 ${
-                  ancestorHidden ? 'opacity-50' : ''
+                  ancestorExcluded && !selfOrAncestorIncluded ? 'opacity-50' : ''
                 }`}
               >
                 <input
                   type="checkbox"
-                  checked={!isExcluded(child.fullPath) && !ancestorHidden}
-                  onChange={() => onToggle(child.fullPath)}
-                  disabled={ancestorHidden}
+                  checked={isVisible}
+                  onChange={handleToggle}
                   className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm text-slate-700">
@@ -241,7 +291,9 @@ function HierarchicalTreeView({ node, excluded, onToggle, separator, depth }: Hi
               <HierarchicalTreeView
                 node={child}
                 excluded={excluded}
+                included={included}
                 onToggle={onToggle}
+                onToggleInclude={onToggleInclude}
                 separator={separator}
                 depth={depth + 1}
               />
