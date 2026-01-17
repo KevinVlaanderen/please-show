@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { SigmaContainer, useRegisterEvents, useSigma } from '@react-sigma/core';
 import '@react-sigma/core/lib/style.css';
 import { EdgeCurvedArrowProgram } from '@sigma/edge-curve';
 import { EdgeLineProgram } from 'sigma/rendering';
+import Graph from 'graphology';
 import type { Settings } from 'sigma/settings';
 import type { NodeDisplayData, PartialButFor } from 'sigma/types';
 import { useAppStore } from '../../stores/appStore';
@@ -157,6 +158,13 @@ export function GraphCanvas({ className }: GraphCanvasProps) {
     []
   );
 
+  // Create a stable empty graph for SigmaContainer's initial prop.
+  // GraphLoader will handle all graph updates via sigma.setGraph().
+  // This prevents WebGL context loss when reloading the same graph.
+  const emptyGraph = useRef(
+    new Graph<GraphNodeAttributes, GraphEdgeAttributes>({ type: 'directed', allowSelfLoops: false })
+  );
+
   if (!graph) {
     return (
       <div className={`flex items-center justify-center bg-slate-100 ${className}`}>
@@ -169,7 +177,7 @@ export function GraphCanvas({ className }: GraphCanvasProps) {
     <SigmaContainer<GraphNodeAttributes, GraphEdgeAttributes>
       className={className}
       style={{ width: '100%', height: '100%' }}
-      graph={graph}
+      graph={emptyGraph.current}
       settings={{
         allowInvalidContainer: true,
         defaultNodeColor: '#6366f1',
