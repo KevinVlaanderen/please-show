@@ -36,9 +36,7 @@ export function DisplayOptionsPanel() {
   const setEdgeBundling = useLayoutStore((state) => state.setEdgeBundling);
 
   return (
-    <div className="p-3 border-t border-slate-200">
-      <h3 className="text-sm font-semibold text-slate-900 mb-3">Display</h3>
-
+    <div className="p-3">
       <div className="mb-4">
         <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
           Color Scheme

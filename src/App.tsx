@@ -3,7 +3,6 @@ import { GraphCanvas } from './components/graph/GraphCanvas';
 import { FileUpload } from './components/data-source/FileUpload';
 import { UrlInput } from './components/data-source/UrlInput';
 import { NodeDetailsPanel } from './components/panels/NodeDetailsPanel';
-import { AnalysisToolbar } from './components/panels/AnalysisToolbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { ExamplesDropdown } from './components/header/ExamplesDropdown';
 import { useAppStore } from './stores/appStore';
@@ -98,7 +97,6 @@ function App() {
           <>
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
-              <AnalysisToolbar />
               <GraphCanvas className="flex-1" />
             </div>
             {selectedNodeId && <NodeDetailsPanel />}

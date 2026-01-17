@@ -69,9 +69,7 @@ export function AnalysisPanel() {
   }, [graph, highlightPath, setFocusedNode]);
 
   return (
-    <div className="p-3 border-t border-slate-200">
-      <h3 className="text-sm font-semibold text-slate-900 mb-3">Analysis</h3>
-
+    <div className="p-3">
       <div className="space-y-3">
         <div>
           <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">

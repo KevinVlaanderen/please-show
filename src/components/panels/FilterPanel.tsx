@@ -74,17 +74,16 @@ export function FilterPanel() {
 
   return (
     <div className="p-3 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">Filters</h3>
-        {hasFilters && (
+      {hasFilters && (
+        <div className="flex justify-end">
           <button
             onClick={clearFilters}
             className="text-xs text-indigo-600 hover:text-indigo-800"
           >
             Clear all
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Binary filter */}
       <label className="flex items-center gap-2 cursor-pointer">
