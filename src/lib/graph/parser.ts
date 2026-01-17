@@ -47,6 +47,7 @@ export function parseGraph(data: PlzQueryOutput): Graph<GraphNodeAttributes, Gra
         color,
         hidden: false,
         highlighted: false,
+        selected: false,
         package: pkgPath,
         targetName,
         binary: target.binary || false,

@@ -10,6 +10,7 @@ export interface GraphNodeAttributes {
   color: string;
   hidden: boolean;
   highlighted: boolean;
+  selected: boolean;
   originalColor?: string;
 
   // Metadata

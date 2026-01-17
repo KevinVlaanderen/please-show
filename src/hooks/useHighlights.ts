@@ -3,7 +3,6 @@ import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 
 const HIGHLIGHT_COLOR = '#dc2626'; // red for path highlighting
-const SELECTION_COLOR = '#2563eb'; // blue for selected node and neighbors
 const OUTBOUND_EDGE_COLOR = '#16a34a'; // green for edges going away from selected
 const INBOUND_EDGE_COLOR = '#dc2626'; // red for edges coming into selected
 
@@ -46,18 +45,20 @@ export function useApplyHighlights() {
       const isSelected = nodeId === selectedNodeId;
       const isNeighbor = neighborSet.has(nodeId);
 
-      // Store original color if not already stored
-      if ((isInPath || isSelected) && !attrs.originalColor) {
+      // Store original color if not already stored (only for path highlighting)
+      if (isInPath && !attrs.originalColor) {
         graph.setNodeAttribute(nodeId, 'originalColor', attrs.color);
       }
+
+      // Set selected attribute
+      graph.setNodeAttribute(nodeId, 'selected', isSelected);
 
       if (isInPath) {
         // Path highlighting takes precedence
         graph.setNodeAttribute(nodeId, 'color', HIGHLIGHT_COLOR);
         graph.setNodeAttribute(nodeId, 'highlighted', true);
       } else if (isSelected) {
-        // Selected node gets selection color
-        graph.setNodeAttribute(nodeId, 'color', SELECTION_COLOR);
+        // Selected node keeps its original color but is highlighted
         graph.setNodeAttribute(nodeId, 'highlighted', true);
       } else if (isNeighbor) {
         // Neighbors are highlighted but keep their original color
