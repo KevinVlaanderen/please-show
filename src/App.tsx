@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { GraphCanvas } from './components/graph/GraphCanvas';
 import { FileUpload } from './components/data-source/FileUpload';
 import { UrlInput } from './components/data-source/UrlInput';
@@ -17,7 +18,13 @@ function App() {
   const stats = useAppStore((state) => state.stats);
   const error = useAppStore((state) => state.error);
   const clearData = useAppStore((state) => state.clearData);
+  const loadFromStorage = useAppStore((state) => state.loadFromStorage);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
 
   // Apply filters, colors, highlights, layout, and edge bundling to graph
   useApplyFilters();

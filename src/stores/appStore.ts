@@ -4,6 +4,8 @@ import type { PlzQueryOutput } from '../types/plz';
 import type { GraphNodeAttributes, GraphEdgeAttributes } from '../types/graph';
 import { parseGraph, getPackages, getLabels, getGraphStats } from '../lib/graph/parser';
 
+const STORAGE_KEY = 'please-show-graph-data';
+
 interface AppState {
   // Data
   rawData: PlzQueryOutput | null;
@@ -21,6 +23,7 @@ interface AppState {
   // Actions
   loadData: (data: PlzQueryOutput) => void;
   loadFromUrl: (url: string) => Promise<void>;
+  loadFromStorage: () => boolean;
   clearData: () => void;
   setError: (error: string | null) => void;
 }
@@ -40,6 +43,13 @@ export const useAppStore = create<AppState>((set) => ({
       const packages = getPackages(graph);
       const labels = getLabels(graph);
       const stats = getGraphStats(graph);
+
+      // Save to localStorage
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {
+        // Ignore storage errors (quota exceeded, etc.)
+      }
 
       set({
         rawData: data,
@@ -67,6 +77,13 @@ export const useAppStore = create<AppState>((set) => ({
       const labels = getLabels(graph);
       const stats = getGraphStats(graph);
 
+      // Save to localStorage
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {
+        // Ignore storage errors (quota exceeded, etc.)
+      }
+
       set({
         rawData: data,
         graph,
@@ -84,7 +101,35 @@ export const useAppStore = create<AppState>((set) => ({
     }
   },
 
+  loadFromStorage: () => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const data = JSON.parse(stored) as PlzQueryOutput;
+        const graph = parseGraph(data);
+        const packages = getPackages(graph);
+        const labels = getLabels(graph);
+        const stats = getGraphStats(graph);
+
+        set({
+          rawData: data,
+          graph,
+          packages,
+          labels,
+          stats,
+          error: null,
+        });
+        return true;
+      }
+    } catch {
+      // Ignore storage errors or invalid data
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    return false;
+  },
+
   clearData: () => {
+    localStorage.removeItem(STORAGE_KEY);
     set({
       rawData: null,
       graph: null,
