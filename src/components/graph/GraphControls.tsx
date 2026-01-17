@@ -21,10 +21,7 @@ export function GraphControls() {
   }, [sigma]);
 
   const handleExport = useCallback(async () => {
-    const container = sigma.getContainer();
-    if (container) {
-      await exportToPng(container, 'please-graph');
-    }
+    await exportToPng(sigma, 'please-graph');
   }, [sigma]);
 
   return (
