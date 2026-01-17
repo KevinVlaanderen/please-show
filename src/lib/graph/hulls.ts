@@ -85,6 +85,44 @@ function expandHull(points: Point[], center: Point, padding: number): Point[] {
 }
 
 /**
+ * Ensure hull has volume by converting degenerate cases (1-2 points or collinear)
+ * into a minimum bounding rectangle with perpendicular padding
+ */
+function ensureHullVolume(points: Point[], minPadding: number): Point[] {
+  if (points.length >= 3) {
+    return points; // Already has volume
+  }
+
+  if (points.length === 1) {
+    // Single point -> square
+    const p = points[0];
+    return [
+      { x: p.x - minPadding, y: p.y - minPadding },
+      { x: p.x + minPadding, y: p.y - minPadding },
+      { x: p.x + minPadding, y: p.y + minPadding },
+      { x: p.x - minPadding, y: p.y + minPadding },
+    ];
+  }
+
+  // 2 points (line) -> thin rectangle
+  const [p1, p2] = points;
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+
+  // Perpendicular unit vector
+  const perpX = len > 0 ? (-dy / len) * minPadding : minPadding;
+  const perpY = len > 0 ? (dx / len) * minPadding : 0;
+
+  return [
+    { x: p1.x + perpX, y: p1.y + perpY },
+    { x: p2.x + perpX, y: p2.y + perpY },
+    { x: p2.x - perpX, y: p2.y - perpY },
+    { x: p1.x - perpX, y: p1.y - perpY },
+  ];
+}
+
+/**
  * Get the depth of a package (number of "/" separators)
  */
 function getPackageDepth(pkg: string): number {
@@ -141,8 +179,8 @@ export function computePackageHulls(
       }
     }
 
-    // Skip packages with fewer than 2 total points
-    if (allPoints.length < 2) continue;
+    // Skip packages with no points
+    if (allPoints.length < 1) continue;
 
     // Calculate center
     const center = {
@@ -151,7 +189,10 @@ export function computePackageHulls(
     };
 
     // Compute hull
-    const hullPoints = grahamScan(allPoints);
+    let hullPoints = grahamScan(allPoints);
+
+    // Ensure hull has volume (handles collinear points)
+    hullPoints = ensureHullVolume(hullPoints, padding);
 
     // Expand hull by padding
     const expandedPoints = expandHull(hullPoints, center, padding);
