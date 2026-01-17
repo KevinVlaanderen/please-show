@@ -1,72 +1,67 @@
 import { create } from 'zustand';
 
 interface FilterState {
-  // Excluded items (exclusion-based filtering)
-  excludedPackages: string[];
-  excludedLabels: string[];
-  // Included packages override parent exclusions
-  includedPackages: string[];
-  includedLabels: string[];
+  // Disabled items (explicit disabled set model)
+  disabledPackages: string[];
+  disabledLabels: string[];
   showBinaryOnly: boolean;
 
   // Actions
-  setExcludedPackages: (packages: string[]) => void;
-  togglePackage: (pkg: string) => void;
-  togglePackageInclude: (pkg: string) => void;
-  setExcludedLabels: (labels: string[]) => void;
-  toggleLabel: (label: string) => void;
-  toggleLabelInclude: (label: string) => void;
+  setDisabledPackages: (packages: string[]) => void;
+  setDisabledLabels: (labels: string[]) => void;
+  setPackagesDisabled: (packages: string[], disabled: boolean) => void;
+  setLabelsDisabled: (labels: string[], disabled: boolean) => void;
   setShowBinaryOnly: (show: boolean) => void;
   clearFilters: () => void;
 }
 
 export const useFilterStore = create<FilterState>((set) => ({
-  excludedPackages: [],
-  excludedLabels: [],
-  includedPackages: [],
-  includedLabels: [],
+  disabledPackages: [],
+  disabledLabels: [],
   showBinaryOnly: false,
 
-  setExcludedPackages: (packages) => set({ excludedPackages: packages }),
+  setDisabledPackages: (packages) => set({ disabledPackages: packages }),
 
-  togglePackage: (pkg) =>
-    set((state) => ({
-      excludedPackages: state.excludedPackages.includes(pkg)
-        ? state.excludedPackages.filter((p) => p !== pkg)
-        : [...state.excludedPackages, pkg],
-    })),
+  setDisabledLabels: (labels) => set({ disabledLabels: labels }),
 
-  togglePackageInclude: (pkg) =>
-    set((state) => ({
-      includedPackages: state.includedPackages.includes(pkg)
-        ? state.includedPackages.filter((p) => p !== pkg)
-        : [...state.includedPackages, pkg],
-    })),
+  setPackagesDisabled: (packages, disabled) =>
+    set((state) => {
+      if (disabled) {
+        // Add packages to disabled set
+        return {
+          disabledPackages: [...new Set([...state.disabledPackages, ...packages])],
+        };
+      } else {
+        // Remove packages from disabled set
+        const toRemove = new Set(packages);
+        return {
+          disabledPackages: state.disabledPackages.filter((p) => !toRemove.has(p)),
+        };
+      }
+    }),
 
-  setExcludedLabels: (labels) => set({ excludedLabels: labels }),
-
-  toggleLabel: (label) =>
-    set((state) => ({
-      excludedLabels: state.excludedLabels.includes(label)
-        ? state.excludedLabels.filter((l) => l !== label)
-        : [...state.excludedLabels, label],
-    })),
-
-  toggleLabelInclude: (label) =>
-    set((state) => ({
-      includedLabels: state.includedLabels.includes(label)
-        ? state.includedLabels.filter((l) => l !== label)
-        : [...state.includedLabels, label],
-    })),
+  setLabelsDisabled: (labels, disabled) =>
+    set((state) => {
+      if (disabled) {
+        // Add labels to disabled set
+        return {
+          disabledLabels: [...new Set([...state.disabledLabels, ...labels])],
+        };
+      } else {
+        // Remove labels from disabled set
+        const toRemove = new Set(labels);
+        return {
+          disabledLabels: state.disabledLabels.filter((l) => !toRemove.has(l)),
+        };
+      }
+    }),
 
   setShowBinaryOnly: (show) => set({ showBinaryOnly: show }),
 
   clearFilters: () =>
     set({
-      excludedPackages: [],
-      excludedLabels: [],
-      includedPackages: [],
-      includedLabels: [],
+      disabledPackages: [],
+      disabledLabels: [],
       showBinaryOnly: false,
     }),
 }));

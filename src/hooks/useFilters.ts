@@ -3,67 +3,17 @@ import { useAppStore } from '../stores/appStore';
 import { useFilterStore } from '../stores/filterStore';
 import { useLayoutStore } from '../stores/layoutStore';
 
-/**
- * Check if a package matches hierarchically against a list.
- * Handles hierarchical matching: "src" matches "src/cli", "src/build", etc.
- * Root (empty string) matches all items.
- */
-function matchesHierarchy(item: string, list: string[], separator: string): boolean {
-  return list.some((entry) => {
-    if (item === entry) return true;
-    // Root entry matches all items
-    if (entry === '') return true;
-    // Check if item is a child of entry (e.g., "src/cli" is child of "src")
-    if (item.startsWith(entry + separator)) return true;
-    return false;
-  });
-}
-
-/**
- * Check if a package should be hidden based on exclusions and inclusions.
- * Inclusions override exclusions for that specific package and its children.
- */
-function isPackageHidden(
-  nodePackage: string,
-  excludedPackages: string[],
-  includedPackages: string[]
-): boolean {
-  const excluded = matchesHierarchy(nodePackage, excludedPackages, '/');
-  if (!excluded) return false;
-
-  // Check if explicitly included (overrides exclusion)
-  const included = matchesHierarchy(nodePackage, includedPackages, '/');
-  return !included;
-}
-
-/**
- * Check if a label should be hidden based on exclusions and inclusions.
- */
-function isLabelHidden(
-  label: string,
-  excludedLabels: string[],
-  includedLabels: string[]
-): boolean {
-  const excluded = matchesHierarchy(label, excludedLabels, ':');
-  if (!excluded) return false;
-
-  const included = matchesHierarchy(label, includedLabels, ':');
-  return !included;
-}
-
 export function useApplyFilters() {
   const graph = useAppStore((state) => state.graph);
-  const {
-    excludedPackages,
-    excludedLabels,
-    includedPackages,
-    includedLabels,
-    showBinaryOnly,
-  } = useFilterStore();
+  const { disabledPackages, disabledLabels, showBinaryOnly } = useFilterStore();
   const triggerRelayout = useLayoutStore((state) => state.triggerRelayout);
 
   useEffect(() => {
     if (!graph) return;
+
+    // Create sets for faster lookup
+    const disabledPackageSet = new Set(disabledPackages);
+    const disabledLabelSet = new Set(disabledLabels);
 
     // Determine which nodes should be visible
     const visibleNodes = new Set<string>();
@@ -71,17 +21,15 @@ export function useApplyFilters() {
     graph.forEachNode((nodeId, attrs) => {
       let visible = true;
 
-      // Package filter (exclusion-based with inclusion overrides, hierarchical)
-      if (isPackageHidden(attrs.package, excludedPackages, includedPackages)) {
+      // Package filter: hidden if package is in disabled set
+      if (disabledPackageSet.has(attrs.package)) {
         visible = false;
       }
 
-      // Label filter (exclude if node has ANY hidden label, hierarchical)
-      if (visible && excludedLabels.length > 0) {
-        const hasHiddenLabel = attrs.labels.some((l) =>
-          isLabelHidden(l, excludedLabels, includedLabels)
-        );
-        if (hasHiddenLabel) visible = false;
+      // Label filter: hidden if node has ANY disabled label
+      if (visible && disabledLabelSet.size > 0) {
+        const hasDisabledLabel = attrs.labels.some((l) => disabledLabelSet.has(l));
+        if (hasDisabledLabel) visible = false;
       }
 
       // Binary filter
@@ -101,5 +49,5 @@ export function useApplyFilters() {
 
     // Trigger layout recomputation so nodes fill available space
     triggerRelayout();
-  }, [graph, excludedPackages, excludedLabels, includedPackages, includedLabels, showBinaryOnly, triggerRelayout]);
+  }, [graph, disabledPackages, disabledLabels, showBinaryOnly, triggerRelayout]);
 }

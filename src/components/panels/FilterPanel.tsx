@@ -1,6 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useFilterStore } from '../../stores/filterStore';
+import {
+  computeCheckboxState,
+  handleToggle,
+  type CheckboxState,
+} from '../../lib/filters/checkboxState';
 
 interface TreeNode {
   name: string;
@@ -49,28 +54,38 @@ export function FilterPanel() {
   const packages = useAppStore((state) => state.packages);
   const labels = useAppStore((state) => state.labels);
   const {
-    excludedPackages,
-    excludedLabels,
-    includedPackages,
-    includedLabels,
+    disabledPackages,
+    disabledLabels,
     showBinaryOnly,
-    togglePackage,
-    toggleLabel,
-    togglePackageInclude,
-    toggleLabelInclude,
+    setDisabledPackages,
+    setDisabledLabels,
     setShowBinaryOnly,
     clearFilters,
   } = useFilterStore();
 
   const hasFilters =
-    excludedPackages.length > 0 ||
-    excludedLabels.length > 0 ||
-    includedPackages.length > 0 ||
-    includedLabels.length > 0 ||
-    showBinaryOnly;
+    disabledPackages.length > 0 || disabledLabels.length > 0 || showBinaryOnly;
 
   const packageTree = useMemo(() => buildTree(packages, '/'), [packages]);
   const labelTree = useMemo(() => buildTree(labels, ':'), [labels]);
+
+  const handlePackageToggle = (
+    path: string,
+    state: CheckboxState,
+    disabled: string[]
+  ) => {
+    const newDisabled = handleToggle(path, state, disabled, packages, '/');
+    setDisabledPackages(newDisabled);
+  };
+
+  const handleLabelToggle = (
+    path: string,
+    state: CheckboxState,
+    disabled: string[]
+  ) => {
+    const newDisabled = handleToggle(path, state, disabled, labels, ':');
+    setDisabledLabels(newDisabled);
+  };
 
   return (
     <div className="p-3 space-y-4">
@@ -100,17 +115,18 @@ export function FilterPanel() {
       <div>
         <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
           Packages
-          {excludedPackages.length > 0 && (
-            <span className="ml-1 text-red-600">({excludedPackages.length} hidden)</span>
+          {disabledPackages.length > 0 && (
+            <span className="ml-1 text-red-600">
+              ({disabledPackages.length} hidden)
+            </span>
           )}
         </h4>
         <div className="max-h-60 overflow-y-auto">
           <HierarchicalTreeView
             node={packageTree}
-            excluded={excludedPackages}
-            included={includedPackages}
-            onToggle={togglePackage}
-            onToggleInclude={togglePackageInclude}
+            disabled={disabledPackages}
+            allItems={packages}
+            onToggle={handlePackageToggle}
             separator="/"
             depth={0}
           />
@@ -122,17 +138,18 @@ export function FilterPanel() {
         <div>
           <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
             Labels
-            {excludedLabels.length > 0 && (
-              <span className="ml-1 text-red-600">({excludedLabels.length} hidden)</span>
+            {disabledLabels.length > 0 && (
+              <span className="ml-1 text-red-600">
+                ({disabledLabels.length} hidden)
+              </span>
             )}
           </h4>
           <div className="max-h-60 overflow-y-auto">
             <HierarchicalTreeView
               node={labelTree}
-              excluded={excludedLabels}
-              included={includedLabels}
-              onToggle={toggleLabel}
-              onToggleInclude={toggleLabelInclude}
+              disabled={disabledLabels}
+              allItems={labels}
+              onToggle={handleLabelToggle}
               separator=":"
               depth={0}
             />
@@ -143,52 +160,49 @@ export function FilterPanel() {
   );
 }
 
+interface TriStateCheckboxProps {
+  state: CheckboxState;
+  onChange: () => void;
+}
+
+function TriStateCheckbox({ state, onChange }: TriStateCheckboxProps) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = state === 'indeterminate';
+    }
+  }, [state]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={state === 'checked'}
+      onChange={onChange}
+      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+    />
+  );
+}
+
 interface HierarchicalTreeViewProps {
   node: TreeNode;
-  excluded: string[];
-  included: string[];
-  onToggle: (item: string) => void;
-  onToggleInclude: (item: string) => void;
+  disabled: string[];
+  allItems: string[];
+  onToggle: (path: string, state: CheckboxState, disabled: string[]) => void;
   separator: string;
   depth: number;
 }
 
 function HierarchicalTreeView({
   node,
-  excluded,
-  included,
+  disabled,
+  allItems,
   onToggle,
-  onToggleInclude,
   separator,
   depth,
 }: HierarchicalTreeViewProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-
-  const isExcluded = (path: string) => excluded.includes(path);
-
-  // Check if any ancestor is excluded (making this node hidden unless explicitly included)
-  // Root (empty string) is an ancestor of all items
-  const isAncestorExcluded = (path: string) => {
-    // Root is an ancestor of everything
-    if (excluded.includes('')) return true;
-    const parts = path.split(separator);
-    for (let i = 1; i < parts.length; i++) {
-      const ancestorPath = parts.slice(0, i).join(separator);
-      if (excluded.includes(ancestorPath)) return true;
-    }
-    return false;
-  };
-
-  // Check if this item or any ancestor is explicitly included
-  const isOrAncestorIncluded = (path: string) => {
-    if (included.includes(path)) return true;
-    const parts = path.split(separator);
-    for (let i = 1; i < parts.length; i++) {
-      const ancestorPath = parts.slice(0, i).join(separator);
-      if (included.includes(ancestorPath)) return true;
-    }
-    return false;
-  };
 
   const toggleCollapse = (path: string) => {
     setCollapsed((prev) => {
@@ -206,16 +220,17 @@ function HierarchicalTreeView({
     a.name.localeCompare(b.name)
   );
 
+  // Compute root state
+  const rootState = computeCheckboxState('', disabled, allItems, separator);
+
   return (
     <>
       {/* Render root item if it exists */}
       {depth === 0 && node.isLeaf && (
         <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-0.5">
-          <input
-            type="checkbox"
-            checked={!isExcluded('')}
-            onChange={() => onToggle('')}
-            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          <TriStateCheckbox
+            state={rootState}
+            onChange={() => onToggle('', rootState, disabled)}
           />
           <span className="text-sm text-slate-700">(root)</span>
         </label>
@@ -225,24 +240,14 @@ function HierarchicalTreeView({
       {sortedChildren.map((child) => {
         const hasChildren = child.children.size > 0;
         const isCollapsed = collapsed.has(child.fullPath);
-        const ancestorExcluded = isAncestorExcluded(child.fullPath);
-        const selfOrAncestorIncluded = isOrAncestorIncluded(child.fullPath);
 
-        // Determine if this item is visible
-        // Visible if: not excluded, OR if ancestor is excluded but we're explicitly included
-        const isVisible = ancestorExcluded
-          ? selfOrAncestorIncluded
-          : !isExcluded(child.fullPath);
-
-        // When ancestor is excluded, toggling affects the include list
-        // Otherwise, toggling affects the exclude list
-        const handleToggle = () => {
-          if (ancestorExcluded) {
-            onToggleInclude(child.fullPath);
-          } else {
-            onToggle(child.fullPath);
-          }
-        };
+        // Compute checkbox state for this node
+        const checkboxState = computeCheckboxState(
+          child.fullPath,
+          disabled,
+          allItems,
+          separator
+        );
 
         return (
           <div key={child.fullPath} style={{ marginLeft: depth > 0 ? 12 : 0 }}>
@@ -270,16 +275,10 @@ function HierarchicalTreeView({
               )}
 
               {/* Checkbox and label */}
-              <label
-                className={`flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-0.5 flex-1 ${
-                  ancestorExcluded && !selfOrAncestorIncluded ? 'opacity-50' : ''
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isVisible}
-                  onChange={handleToggle}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-0.5 flex-1">
+                <TriStateCheckbox
+                  state={checkboxState}
+                  onChange={() => onToggle(child.fullPath, checkboxState, disabled)}
                 />
                 <span className="text-sm text-slate-700">
                   {child.name}
@@ -292,10 +291,9 @@ function HierarchicalTreeView({
             {hasChildren && !isCollapsed && (
               <HierarchicalTreeView
                 node={child}
-                excluded={excluded}
-                included={included}
+                disabled={disabled}
+                allItems={allItems}
                 onToggle={onToggle}
-                onToggleInclude={onToggleInclude}
                 separator={separator}
                 depth={depth + 1}
               />
@@ -306,4 +304,3 @@ function HierarchicalTreeView({
     </>
   );
 }
-
