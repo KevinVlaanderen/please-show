@@ -60,7 +60,7 @@ export function useApplyFilters() {
     includedLabels,
     showBinaryOnly,
   } = useFilterStore();
-  const incrementHullVersion = useLayoutStore((state) => state.incrementHullVersion);
+  const triggerRelayout = useLayoutStore((state) => state.triggerRelayout);
 
   useEffect(() => {
     if (!graph) return;
@@ -99,7 +99,7 @@ export function useApplyFilters() {
       graph.setEdgeAttribute(edgeId, 'hidden', hidden);
     });
 
-    // Signal that filters changed so hulls can be recomputed
-    incrementHullVersion();
-  }, [graph, excludedPackages, excludedLabels, includedPackages, includedLabels, showBinaryOnly, incrementHullVersion]);
+    // Trigger layout recomputation so nodes fill available space
+    triggerRelayout();
+  }, [graph, excludedPackages, excludedLabels, includedPackages, includedLabels, showBinaryOnly, triggerRelayout]);
 }
