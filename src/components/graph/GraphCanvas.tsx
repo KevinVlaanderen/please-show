@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { SigmaContainer, useRegisterEvents, useSigma } from '@react-sigma/core';
 import '@react-sigma/core/lib/style.css';
-import EdgeCurveProgram from '@sigma/edge-curve';
+import { EdgeCurvedArrowProgram } from '@sigma/edge-curve';
 import { EdgeLineProgram } from 'sigma/rendering';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -85,7 +85,7 @@ export function GraphCanvas({ className }: GraphCanvasProps) {
   const edgeProgramClasses = useMemo(
     () => ({
       line: EdgeLineProgram,
-      curved: EdgeCurveProgram,
+      curved: EdgeCurvedArrowProgram,
     }),
     []
   );
