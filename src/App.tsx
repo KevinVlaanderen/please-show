@@ -5,6 +5,7 @@ import { UrlInput } from './components/data-source/UrlInput';
 import { NodeDetailsPanel } from './components/panels/NodeDetailsPanel';
 import { AnalysisToolbar } from './components/panels/AnalysisToolbar';
 import { Sidebar } from './components/layout/Sidebar';
+import { ExamplesDropdown } from './components/header/ExamplesDropdown';
 import { useAppStore } from './stores/appStore';
 import { useUIStore } from './stores/uiStore';
 import { useApplyFilters } from './hooks/useFilters';
@@ -39,20 +40,23 @@ function App() {
       <header className="bg-white border-b border-slate-200 px-4 py-3">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold text-slate-900">Please Build Graph Viewer</h1>
-          {graph && (
-            <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4">
+            {graph && (
               <div className="text-sm text-slate-500">
                 {stats?.nodeCount} nodes &middot; {stats?.edgeCount} edges &middot;{' '}
                 {stats?.packages} packages
               </div>
+            )}
+            <ExamplesDropdown />
+            {graph && (
               <button
                 onClick={clearData}
                 className="px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md"
               >
                 Clear
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
