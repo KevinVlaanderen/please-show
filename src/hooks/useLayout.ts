@@ -5,7 +5,7 @@ import { applyLayout, type LayoutAlgorithm } from '../lib/graph/layout';
 
 /**
  * Hook to apply layout to the graph based on layout settings
- * Re-applies layout when the graph changes or when triggerRelayout is called
+ * Re-applies layout when the graph changes or when any layout setting changes
  */
 export function useApplyLayout() {
   const graph = useAppStore((state) => state.graph);
@@ -17,9 +17,8 @@ export function useApplyLayout() {
   const dissuadeHubs = useLayoutStore((state) => state.dissuadeHubs);
   const incrementHullVersion = useLayoutStore((state) => state.incrementHullVersion);
 
-  // Track which graph we've applied layout to
+  // Track whether we've done initial layout for the current graph
   const graphRef = useRef(graph);
-  const lastLayoutVersion = useRef(layoutVersion);
 
   useEffect(() => {
     if (!graph) {
@@ -27,16 +26,7 @@ export function useApplyLayout() {
       return;
     }
 
-    // Determine if we need to apply layout
-    const isNewGraph = graph !== graphRef.current;
-    const isRelayoutTriggered = layoutVersion !== lastLayoutVersion.current;
-
-    if (!isNewGraph && !isRelayoutTriggered) {
-      return;
-    }
-
     graphRef.current = graph;
-    lastLayoutVersion.current = layoutVersion;
 
     // Determine algorithm based on settings
     // Hierarchical takes precedence if both are enabled

@@ -27,7 +27,6 @@ export function DisplayOptionsPanel() {
   const setClusteringStrength = useLayoutStore((state) => state.setClusteringStrength);
   const hierarchicalLayout = useLayoutStore((state) => state.hierarchicalLayout);
   const setHierarchicalLayout = useLayoutStore((state) => state.setHierarchicalLayout);
-  const triggerRelayout = useLayoutStore((state) => state.triggerRelayout);
   const showHulls = useLayoutStore((state) => state.showHulls);
   const setShowHulls = useLayoutStore((state) => state.setShowHulls);
   const layoutQuality = useLayoutStore((state) => state.layoutQuality);
@@ -166,12 +165,6 @@ export function DisplayOptionsPanel() {
           </div>
         </div>
 
-        <button
-          onClick={triggerRelayout}
-          className="mt-3 w-full px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md border border-slate-200"
-        >
-          Re-apply Layout
-        </button>
       </div>
     </div>
   );
