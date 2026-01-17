@@ -36,8 +36,7 @@ src/
 │   │   └── colors.ts    # Color scheme utilities
 │   ├── analysis/
 │   │   ├── pathFinder.ts    # BFS shortest path
-│   │   ├── cycleDetector.ts # DFS cycle detection
-│   │   └── impact.ts        # Reverse dependency analysis
+│   │   └── cycleDetector.ts # DFS cycle detection
 │   └── export/
 │       └── png.ts       # PNG export via html-to-image
 └── types/

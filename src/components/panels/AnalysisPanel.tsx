@@ -3,21 +3,18 @@ import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import { findShortestPath } from '../../lib/analysis/pathFinder';
 import { findCycles } from '../../lib/analysis/cycleDetector';
-import { getReverseDependencies } from '../../lib/analysis/impact';
 
 export function AnalysisPanel() {
   const graph = useAppStore((state) => state.graph);
   const highlightPath = useUIStore((state) => state.highlightPath);
   const clearHighlights = useUIStore((state) => state.clearHighlights);
   const setFocusedNode = useUIStore((state) => state.setFocusedNode);
-  const selectedNodeId = useUIStore((state) => state.selectedNodeId);
 
   const [sourceNode, setSourceNode] = useState('');
   const [targetNode, setTargetNode] = useState('');
   const [pathResult, setPathResult] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cycles, setCycles] = useState<string[][] | null>(null);
-  const [impactedNodes, setImpactedNodes] = useState<string[] | null>(null);
 
   const handleFindPath = useCallback(() => {
     if (!graph || !sourceNode || !targetNode) return;
@@ -51,19 +48,8 @@ export function AnalysisPanel() {
     setPathResult(null);
     setError(null);
     setCycles(null);
-    setImpactedNodes(null);
     clearHighlights();
   }, [clearHighlights]);
-
-  const handleShowImpact = useCallback(() => {
-    if (!graph || !selectedNodeId) return;
-
-    const impacted = getReverseDependencies(graph, selectedNodeId);
-    setImpactedNodes(impacted);
-
-    // Highlight selected node + all impacted nodes
-    highlightPath([selectedNodeId, ...impacted]);
-  }, [graph, selectedNodeId, highlightPath]);
 
   const handleDetectCycles = useCallback(() => {
     if (!graph) return;
@@ -142,45 +128,6 @@ export function AnalysisPanel() {
             </ul>
           </div>
         )}
-
-        <div className="border-t border-slate-200 pt-3">
-          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
-            Impact Analysis
-          </h4>
-          <button
-            onClick={handleShowImpact}
-            disabled={!selectedNodeId}
-            className="w-full px-3 py-1.5 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {selectedNodeId ? 'Show What Depends on Selected' : 'Select a node first'}
-          </button>
-
-          {impactedNodes !== null && (
-            <div className="mt-2">
-              {impactedNodes.length === 0 ? (
-                <p className="text-sm text-slate-600">No dependents found</p>
-              ) : (
-                <div>
-                  <p className="text-sm text-purple-600 mb-1">
-                    {impactedNodes.length} node(s) would be affected
-                  </p>
-                  <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto">
-                    {impactedNodes.slice(0, 20).map((node) => (
-                      <li key={node} className="text-slate-600 truncate" title={node}>
-                        {node}
-                      </li>
-                    ))}
-                    {impactedNodes.length > 20 && (
-                      <li className="text-slate-400">
-                        ...and {impactedNodes.length - 20} more
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
         <div className="border-t border-slate-200 pt-3">
           <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">

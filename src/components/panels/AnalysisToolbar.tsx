@@ -3,21 +3,18 @@ import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import { findShortestPath } from '../../lib/analysis/pathFinder';
 import { findCycles } from '../../lib/analysis/cycleDetector';
-import { getReverseDependencies } from '../../lib/analysis/impact';
 
 export function AnalysisToolbar() {
   const graph = useAppStore((state) => state.graph);
   const highlightPath = useUIStore((state) => state.highlightPath);
   const clearHighlights = useUIStore((state) => state.clearHighlights);
   const setFocusedNode = useUIStore((state) => state.setFocusedNode);
-  const selectedNodeId = useUIStore((state) => state.selectedNodeId);
 
   const [sourceNode, setSourceNode] = useState('');
   const [targetNode, setTargetNode] = useState('');
   const [pathResult, setPathResult] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cycles, setCycles] = useState<string[][] | null>(null);
-  const [impactedNodes, setImpactedNodes] = useState<string[] | null>(null);
 
   const handleFindPath = useCallback(() => {
     if (!graph || !sourceNode || !targetNode) return;
@@ -25,7 +22,6 @@ export function AnalysisToolbar() {
     setError(null);
     setPathResult(null);
     setCycles(null);
-    setImpactedNodes(null);
 
     if (!graph.hasNode(sourceNode)) {
       setError(`Source node not found: ${sourceNode}`);
@@ -53,27 +49,13 @@ export function AnalysisToolbar() {
     setPathResult(null);
     setError(null);
     setCycles(null);
-    setImpactedNodes(null);
     clearHighlights();
   }, [clearHighlights]);
-
-  const handleShowImpact = useCallback(() => {
-    if (!graph || !selectedNodeId) return;
-
-    setPathResult(null);
-    setCycles(null);
-    setError(null);
-
-    const impacted = getReverseDependencies(graph, selectedNodeId);
-    setImpactedNodes(impacted);
-    highlightPath([selectedNodeId, ...impacted]);
-  }, [graph, selectedNodeId, highlightPath]);
 
   const handleDetectCycles = useCallback(() => {
     if (!graph) return;
 
     setPathResult(null);
-    setImpactedNodes(null);
     setError(null);
 
     const foundCycles = findCycles(graph);
@@ -121,21 +103,6 @@ export function AnalysisToolbar() {
           </button>
         </div>
 
-        {/* Impact Analysis */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-            Impact
-          </span>
-          <button
-            onClick={handleShowImpact}
-            disabled={!selectedNodeId}
-            className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={selectedNodeId ? `Show dependents of ${selectedNodeId}` : 'Select a node first'}
-          >
-            Show Dependents
-          </button>
-        </div>
-
         {/* Cycle Detection */}
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -160,13 +127,6 @@ export function AnalysisToolbar() {
           {error && <span className="text-sm text-red-600">{error}</span>}
           {pathResult && (
             <span className="text-indigo-600">Path: {pathResult.length} nodes</span>
-          )}
-          {impactedNodes !== null && (
-            <span className="text-purple-600">
-              {impactedNodes.length === 0
-                ? 'No dependents'
-                : `${impactedNodes.length} dependent(s)`}
-            </span>
           )}
           {cycles !== null && (
             <span className={cycles.length === 0 ? 'text-green-600' : 'text-red-600'}>
