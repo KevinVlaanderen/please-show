@@ -25,7 +25,7 @@ function hexToRgba(hex: string, opacity: number): string {
 export function HullRenderer() {
   const sigma = useSigma<GraphNodeAttributes, GraphEdgeAttributes>();
   const showHulls = useLayoutStore((state) => state.showHulls);
-  const layoutVersion = useLayoutStore((state) => state.layoutVersion);
+  const hullVersion = useLayoutStore((state) => state.hullVersion);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hullsRef = useRef<Map<string, PackageHull>>(new Map());
 
@@ -123,7 +123,7 @@ export function HullRenderer() {
 
     // Initial draw
     drawHulls();
-  }, [sigma, showHulls, layoutVersion, drawHulls]);
+  }, [sigma, showHulls, hullVersion, drawHulls]);
 
   // Redraw on camera changes
   useEffect(() => {

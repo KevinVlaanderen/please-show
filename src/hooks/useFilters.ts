@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useFilterStore } from '../stores/filterStore';
+import { useLayoutStore } from '../stores/layoutStore';
 
 /**
  * Check if a package matches hierarchically against a list.
@@ -59,6 +60,7 @@ export function useApplyFilters() {
     includedLabels,
     showBinaryOnly,
   } = useFilterStore();
+  const incrementHullVersion = useLayoutStore((state) => state.incrementHullVersion);
 
   useEffect(() => {
     if (!graph) return;
@@ -96,5 +98,8 @@ export function useApplyFilters() {
       const hidden = !visibleNodes.has(source) || !visibleNodes.has(target);
       graph.setEdgeAttribute(edgeId, 'hidden', hidden);
     });
-  }, [graph, excludedPackages, excludedLabels, includedPackages, includedLabels, showBinaryOnly]);
+
+    // Signal that filters changed so hulls can be recomputed
+    incrementHullVersion();
+  }, [graph, excludedPackages, excludedLabels, includedPackages, includedLabels, showBinaryOnly, incrementHullVersion]);
 }

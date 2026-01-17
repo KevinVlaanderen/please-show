@@ -15,6 +15,7 @@ export function useApplyLayout() {
   const layoutVersion = useLayoutStore((state) => state.layoutVersion);
   const layoutQuality = useLayoutStore((state) => state.layoutQuality);
   const dissuadeHubs = useLayoutStore((state) => state.dissuadeHubs);
+  const incrementHullVersion = useLayoutStore((state) => state.incrementHullVersion);
 
   // Track which graph we've applied layout to
   const graphRef = useRef(graph);
@@ -53,5 +54,8 @@ export function useApplyLayout() {
       quality: layoutQuality,
       dissuadeHubs,
     });
-  }, [graph, clusterByPackage, clusteringStrength, hierarchicalLayout, layoutVersion, layoutQuality, dissuadeHubs]);
+
+    // Signal that layout is complete so hulls can be recomputed
+    incrementHullVersion();
+  }, [graph, clusterByPackage, clusteringStrength, hierarchicalLayout, layoutVersion, layoutQuality, dissuadeHubs, incrementHullVersion]);
 }
