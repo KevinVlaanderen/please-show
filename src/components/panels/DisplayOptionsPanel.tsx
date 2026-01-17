@@ -25,6 +25,8 @@ export function DisplayOptionsPanel() {
   const setClusterByPackage = useLayoutStore((state) => state.setClusterByPackage);
   const clusteringStrength = useLayoutStore((state) => state.clusteringStrength);
   const setClusteringStrength = useLayoutStore((state) => state.setClusteringStrength);
+  const hierarchicalLayout = useLayoutStore((state) => state.hierarchicalLayout);
+  const setHierarchicalLayout = useLayoutStore((state) => state.setHierarchicalLayout);
   const triggerRelayout = useLayoutStore((state) => state.triggerRelayout);
   const showHulls = useLayoutStore((state) => state.showHulls);
   const setShowHulls = useLayoutStore((state) => state.setShowHulls);
@@ -95,6 +97,18 @@ export function DisplayOptionsPanel() {
                 <span className="text-sm text-slate-700">{option.label}</span>
               </label>
             ))}
+            <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 mt-2">
+              <input
+                type="checkbox"
+                checked={hierarchicalLayout}
+                onChange={(e) => setHierarchicalLayout(e.target.checked)}
+                className="text-indigo-600 focus:ring-indigo-500 rounded"
+              />
+              <div>
+                <span className="text-sm text-slate-700">Hierarchical nesting</span>
+                <p className="text-xs text-slate-500">Sub-packages inside parents</p>
+              </div>
+            </label>
           </div>
         )}
 

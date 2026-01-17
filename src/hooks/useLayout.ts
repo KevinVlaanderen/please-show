@@ -11,6 +11,7 @@ export function useApplyLayout() {
   const graph = useAppStore((state) => state.graph);
   const clusterByPackage = useLayoutStore((state) => state.clusterByPackage);
   const clusteringStrength = useLayoutStore((state) => state.clusteringStrength);
+  const hierarchicalLayout = useLayoutStore((state) => state.hierarchicalLayout);
   const layoutVersion = useLayoutStore((state) => state.layoutVersion);
   const layoutQuality = useLayoutStore((state) => state.layoutQuality);
   const dissuadeHubs = useLayoutStore((state) => state.dissuadeHubs);
@@ -37,14 +38,20 @@ export function useApplyLayout() {
     lastLayoutVersion.current = layoutVersion;
 
     // Determine algorithm based on settings
-    const algorithm: LayoutAlgorithm = clusterByPackage
-      ? 'clusteredForceAtlas2'
-      : 'forceAtlas2';
+    // Hierarchical takes precedence if both are enabled
+    let algorithm: LayoutAlgorithm;
+    if (clusterByPackage && hierarchicalLayout) {
+      algorithm = 'hierarchical';
+    } else if (clusterByPackage) {
+      algorithm = 'clusteredForceAtlas2';
+    } else {
+      algorithm = 'forceAtlas2';
+    }
 
     applyLayout(graph, algorithm, {
       clusteringStrength,
       quality: layoutQuality,
       dissuadeHubs,
     });
-  }, [graph, clusterByPackage, clusteringStrength, layoutVersion, layoutQuality, dissuadeHubs]);
+  }, [graph, clusterByPackage, clusteringStrength, hierarchicalLayout, layoutVersion, layoutQuality, dissuadeHubs]);
 }

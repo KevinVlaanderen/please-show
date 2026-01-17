@@ -1,16 +1,20 @@
 import Graph from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import { circular } from 'graphology-layout';
-import type { GraphNodeAttributes, GraphEdgeAttributes } from '../../types/graph';
+import { topologicalGenerations } from 'graphology-dag';
+import type { GraphNodeAttributes, GraphEdgeAttributes, PackageTreeNode, Bounds } from '../../types/graph';
 import type { ClusteringStrength, LayoutQuality } from '../../stores/layoutStore';
+import { buildPackageTree, computePackageAverageLayer } from './packageTree';
+import { applyTreemapToPackageTree, padBounds } from './treemap';
 
-export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'circular' | 'random';
+export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'hierarchical' | 'circular' | 'random';
 
 interface LayoutOptions {
   iterations?: number;
   clusteringStrength?: ClusteringStrength;
   quality?: LayoutQuality;
   dissuadeHubs?: boolean;
+  hierarchical?: boolean;
 }
 
 const qualityPresets = {
@@ -288,6 +292,333 @@ export function applyRandomLayout(
 }
 
 /**
+ * Hierarchical layout with treemap-based space partitioning
+ *
+ * Algorithm phases:
+ * 1. Build package hierarchy tree
+ * 2. Compute DAG topology for ordering
+ * 3. Apply treemap partitioning (top-down)
+ * 4. Position nodes within package bounds (constrained ForceAtlas2)
+ */
+function applyHierarchicalLayout(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
+  options: LayoutOptions = {}
+): void {
+  const {
+    quality = 'balanced',
+    dissuadeHubs = true,
+  } = options;
+  const preset = qualityPresets[quality];
+  const iterations = options.iterations ?? preset.iterations;
+
+  if (graph.order === 0) return;
+
+  // Phase 0: Build package tree
+  const packageTree = buildPackageTree(graph);
+
+  // Phase 1: Compute DAG topology for ordering
+  const nodeToLayer = computeTopologicalLayers(graph);
+
+  // Create ordering function for sibling packages
+  const siblingOrderFn = (children: PackageTreeNode[]): PackageTreeNode[] => {
+    return [...children].sort((a, b) => {
+      const layerA = computePackageAverageLayer(a, nodeToLayer);
+      const layerB = computePackageAverageLayer(b, nodeToLayer);
+      return layerA - layerB;
+    });
+  };
+
+  // Phase 2-3: Apply treemap partitioning
+  // Calculate canvas size based on number of nodes
+  const canvasSize = Math.max(1000, Math.sqrt(graph.order) * 150);
+  const rootBounds: Bounds = {
+    x: -canvasSize / 2,
+    y: -canvasSize / 2,
+    width: canvasSize,
+    height: canvasSize,
+  };
+
+  applyTreemapToPackageTree(
+    packageTree,
+    rootBounds,
+    20,  // padding
+    50,  // minSize
+    siblingOrderFn
+  );
+
+  // Phase 4: Position nodes within their package bounds
+  positionNodesInPackages(graph, packageTree, nodeToLayer, iterations, preset.barnesHutTheta, dissuadeHubs);
+}
+
+/**
+ * Compute topological layers using graphology-dag
+ * Falls back to empty map if the graph has cycles
+ */
+function computeTopologicalLayers(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>
+): Map<string, number> {
+  const nodeToLayer = new Map<string, number>();
+
+  try {
+    // topologicalGenerations returns array of arrays (generations)
+    const generations = topologicalGenerations(graph);
+    generations.forEach((generation, layerIndex) => {
+      for (const nodeId of generation) {
+        nodeToLayer.set(nodeId, layerIndex);
+      }
+    });
+  } catch {
+    // Graph has cycles, fall back to no ordering
+    // Nodes will get layer 0, resulting in alphabetical ordering
+  }
+
+  return nodeToLayer;
+}
+
+/**
+ * Position nodes within their package's assigned bounds
+ * Uses bounded ForceAtlas2 for each package
+ */
+function positionNodesInPackages(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
+  packageTree: PackageTreeNode,
+  nodeToLayer: Map<string, number>,
+  iterations: number,
+  barnesHutTheta: number,
+  dissuadeHubs: boolean
+): void {
+  // Process packages depth-first (children first)
+  processPackageNode(graph, packageTree, nodeToLayer, iterations, barnesHutTheta, dissuadeHubs);
+}
+
+/**
+ * Process a single package node - position its direct nodes within bounds
+ */
+function processPackageNode(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
+  packageNode: PackageTreeNode,
+  nodeToLayer: Map<string, number>,
+  iterations: number,
+  barnesHutTheta: number,
+  dissuadeHubs: boolean
+): void {
+  // First, recursively process children
+  for (const child of packageNode.children.values()) {
+    processPackageNode(graph, child, nodeToLayer, iterations, barnesHutTheta, dissuadeHubs);
+  }
+
+  // Then position this package's direct nodes
+  const nodes = packageNode.nodes;
+  if (nodes.length === 0 || !packageNode.bounds) {
+    return;
+  }
+
+  const bounds = packageNode.bounds;
+
+  // Calculate the bounds for direct nodes (excluding children's space)
+  let directNodeBounds = bounds;
+  if (packageNode.children.size > 0) {
+    // Need to figure out where direct nodes go
+    // In the treemap, we reserved space for direct nodes
+    const directNodeWeight = nodes.length;
+    const childrenWeight = Array.from(packageNode.children.values()).reduce(
+      (sum, child) => sum + child.weight,
+      0
+    );
+    const totalWeight = directNodeWeight + childrenWeight;
+
+    if (totalWeight > 0 && directNodeWeight > 0) {
+      const innerBounds = padBounds(bounds, 20);
+      const directFraction = directNodeWeight / totalWeight;
+      const isWide = innerBounds.width >= innerBounds.height;
+
+      if (isWide) {
+        // Direct nodes get the left portion
+        directNodeBounds = {
+          x: innerBounds.x,
+          y: innerBounds.y,
+          width: innerBounds.width * directFraction,
+          height: innerBounds.height,
+        };
+      } else {
+        // Direct nodes get the top portion
+        directNodeBounds = {
+          x: innerBounds.x,
+          y: innerBounds.y,
+          width: innerBounds.width,
+          height: innerBounds.height * directFraction,
+        };
+      }
+    }
+  }
+
+  if (nodes.length === 1) {
+    // Single node - center it
+    graph.setNodeAttribute(nodes[0], 'x', directNodeBounds.x + directNodeBounds.width / 2);
+    graph.setNodeAttribute(nodes[0], 'y', directNodeBounds.y + directNodeBounds.height / 2);
+    return;
+  }
+
+  // Create subgraph for bounded ForceAtlas2
+  const subgraph = new Graph({ type: 'directed' });
+  const nodeSet = new Set(nodes);
+
+  // Initialize positions biased by topological layer
+  const maxLayer = Math.max(...nodes.map(n => nodeToLayer.get(n) ?? 0), 1);
+
+  for (const nodeId of nodes) {
+    const layer = nodeToLayer.get(nodeId) ?? 0;
+    // Bias initial x position by topological layer (left-to-right flow)
+    const xBias = (layer / maxLayer) * directNodeBounds.width;
+    subgraph.addNode(nodeId, {
+      x: directNodeBounds.x + xBias + (Math.random() - 0.5) * (directNodeBounds.width * 0.3),
+      y: directNodeBounds.y + Math.random() * directNodeBounds.height,
+      size: graph.getNodeAttribute(nodeId, 'size') || 5,
+    });
+  }
+
+  // Add only internal edges
+  for (const nodeId of nodes) {
+    graph.forEachOutEdge(nodeId, (_, __, _source, target) => {
+      if (nodeSet.has(target) && !subgraph.hasEdge(nodeId, target)) {
+        subgraph.addEdge(nodeId, target);
+      }
+    });
+  }
+
+  // Run bounded ForceAtlas2
+  runBoundedForceAtlas2(subgraph, directNodeBounds, Math.round(iterations * 0.5), barnesHutTheta, dissuadeHubs);
+
+  // Copy positions back to main graph
+  for (const nodeId of nodes) {
+    graph.setNodeAttribute(nodeId, 'x', subgraph.getNodeAttribute(nodeId, 'x'));
+    graph.setNodeAttribute(nodeId, 'y', subgraph.getNodeAttribute(nodeId, 'y'));
+  }
+}
+
+/**
+ * Run ForceAtlas2 with boundary constraints
+ * After each iteration batch, applies boundary forces and clamping
+ */
+function runBoundedForceAtlas2(
+  subgraph: Graph,
+  bounds: Bounds,
+  totalIterations: number,
+  barnesHutTheta: number,
+  dissuadeHubs: boolean
+): void {
+  const nodeCount = subgraph.order;
+  if (nodeCount === 0) return;
+
+  // For small subgraphs, run FA2 normally then clamp
+  if (nodeCount <= 3) {
+    forceAtlas2.assign(subgraph, {
+      iterations: totalIterations,
+      settings: {
+        gravity: 1,
+        scalingRatio: 10,
+        strongGravityMode: true,
+        adjustSizes: true,
+        linLogMode: true,
+        outboundAttractionDistribution: dissuadeHubs,
+      },
+    });
+    clampNodesToBounds(subgraph, bounds);
+    return;
+  }
+
+  // Run FA2 in batches with boundary enforcement
+  const batchSize = 25;
+  const batches = Math.ceil(totalIterations / batchSize);
+
+  for (let i = 0; i < batches; i++) {
+    const iters = Math.min(batchSize, totalIterations - i * batchSize);
+
+    forceAtlas2.assign(subgraph, {
+      iterations: iters,
+      settings: {
+        gravity: 1,
+        scalingRatio: 10,
+        strongGravityMode: true,
+        barnesHutOptimize: nodeCount > 50,
+        barnesHutTheta,
+        adjustSizes: true,
+        linLogMode: true,
+        outboundAttractionDistribution: dissuadeHubs,
+      },
+    });
+
+    // Apply soft boundary forces
+    applyBoundaryForces(subgraph, bounds, 0.3);
+
+    // Hard clamp as fallback
+    clampNodesToBounds(subgraph, bounds);
+  }
+}
+
+/**
+ * Apply soft forces pushing nodes away from boundaries
+ */
+function applyBoundaryForces(
+  graph: Graph,
+  bounds: Bounds,
+  strength: number
+): void {
+  const margin = 20;
+  const innerLeft = bounds.x + margin;
+  const innerRight = bounds.x + bounds.width - margin;
+  const innerTop = bounds.y + margin;
+  const innerBottom = bounds.y + bounds.height - margin;
+
+  graph.forEachNode((nodeId) => {
+    let x = graph.getNodeAttribute(nodeId, 'x');
+    let y = graph.getNodeAttribute(nodeId, 'y');
+
+    // Push away from left edge
+    if (x < innerLeft) {
+      x += (innerLeft - x) * strength;
+    }
+    // Push away from right edge
+    if (x > innerRight) {
+      x -= (x - innerRight) * strength;
+    }
+    // Push away from top edge
+    if (y < innerTop) {
+      y += (innerTop - y) * strength;
+    }
+    // Push away from bottom edge
+    if (y > innerBottom) {
+      y -= (y - innerBottom) * strength;
+    }
+
+    graph.setNodeAttribute(nodeId, 'x', x);
+    graph.setNodeAttribute(nodeId, 'y', y);
+  });
+}
+
+/**
+ * Hard clamp all nodes to stay within bounds
+ */
+function clampNodesToBounds(graph: Graph, bounds: Bounds): void {
+  const margin = 10;
+  const minX = bounds.x + margin;
+  const maxX = bounds.x + bounds.width - margin;
+  const minY = bounds.y + margin;
+  const maxY = bounds.y + bounds.height - margin;
+
+  graph.forEachNode((nodeId) => {
+    let x = graph.getNodeAttribute(nodeId, 'x');
+    let y = graph.getNodeAttribute(nodeId, 'y');
+
+    x = Math.max(minX, Math.min(maxX, x));
+    y = Math.max(minY, Math.min(maxY, y));
+
+    graph.setNodeAttribute(nodeId, 'x', x);
+    graph.setNodeAttribute(nodeId, 'y', y);
+  });
+}
+
+/**
  * Apply a named layout algorithm
  */
 export function applyLayout(
@@ -301,6 +632,9 @@ export function applyLayout(
       break;
     case 'clusteredForceAtlas2':
       applyClusteredForceAtlas2(graph, options);
+      break;
+    case 'hierarchical':
+      applyHierarchicalLayout(graph, options);
       break;
     case 'circular':
       applyCircularLayout(graph);

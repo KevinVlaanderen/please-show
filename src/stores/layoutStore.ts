@@ -6,6 +6,7 @@ export type LayoutQuality = 'fast' | 'balanced' | 'quality';
 interface LayoutState {
   clusterByPackage: boolean;
   clusteringStrength: ClusteringStrength;
+  hierarchicalLayout: boolean;
   layoutVersion: number;
   showHulls: boolean;
   layoutQuality: LayoutQuality;
@@ -13,6 +14,7 @@ interface LayoutState {
   edgeBundling: boolean;
   setClusterByPackage: (enabled: boolean) => void;
   setClusteringStrength: (strength: ClusteringStrength) => void;
+  setHierarchicalLayout: (enabled: boolean) => void;
   triggerRelayout: () => void;
   setShowHulls: (show: boolean) => void;
   setLayoutQuality: (quality: LayoutQuality) => void;
@@ -23,6 +25,7 @@ interface LayoutState {
 export const useLayoutStore = create<LayoutState>((set) => ({
   clusterByPackage: true,
   clusteringStrength: 'weak',
+  hierarchicalLayout: false,
   layoutVersion: 0,
   showHulls: false,
   layoutQuality: 'balanced',
@@ -30,6 +33,7 @@ export const useLayoutStore = create<LayoutState>((set) => ({
   edgeBundling: true,
   setClusterByPackage: (enabled) => set({ clusterByPackage: enabled }),
   setClusteringStrength: (strength) => set({ clusteringStrength: strength }),
+  setHierarchicalLayout: (enabled) => set({ hierarchicalLayout: enabled }),
   triggerRelayout: () => set((state) => ({ layoutVersion: state.layoutVersion + 1 })),
   setShowHulls: (show) => set({ showHulls: show }),
   setLayoutQuality: (quality) => set({ layoutQuality: quality }),
