@@ -5,10 +5,13 @@ import { useFilterStore } from '../stores/filterStore';
 /**
  * Check if a package matches hierarchically against a list.
  * Handles hierarchical matching: "src" matches "src/cli", "src/build", etc.
+ * Root (empty string) matches all items.
  */
 function matchesHierarchy(item: string, list: string[], separator: string): boolean {
   return list.some((entry) => {
     if (item === entry) return true;
+    // Root entry matches all items
+    if (entry === '') return true;
     // Check if item is a child of entry (e.g., "src/cli" is child of "src")
     if (item.startsWith(entry + separator)) return true;
     return false;

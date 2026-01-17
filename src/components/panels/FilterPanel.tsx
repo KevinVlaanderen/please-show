@@ -168,7 +168,10 @@ function HierarchicalTreeView({
   const isExcluded = (path: string) => excluded.includes(path);
 
   // Check if any ancestor is excluded (making this node hidden unless explicitly included)
+  // Root (empty string) is an ancestor of all items
   const isAncestorExcluded = (path: string) => {
+    // Root is an ancestor of everything
+    if (excluded.includes('')) return true;
     const parts = path.split(separator);
     for (let i = 1; i < parts.length; i++) {
       const ancestorPath = parts.slice(0, i).join(separator);
