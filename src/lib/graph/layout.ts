@@ -5,7 +5,7 @@ import noverlap from 'graphology-layout-noverlap';
 import { topologicalGenerations } from 'graphology-dag';
 import dagre from '@dagrejs/dagre';
 import type { GraphNodeAttributes, GraphEdgeAttributes, PackageTreeNode, Bounds } from '../../types/graph';
-import type { ClusteringStrength, LayoutQuality, LayeredDirection } from '../../stores/layoutStore';
+import type { ClusteringStrength, LayoutQuality, LayeredDirection, LayeredSpacing } from '../../stores/layoutStore';
 import { buildPackageTree, computePackageAverageLayer } from './packageTree';
 import { applyTreemapToPackageTree, padBounds } from './treemap';
 
@@ -18,6 +18,7 @@ interface LayoutOptions {
   dissuadeHubs?: boolean;
   hierarchical?: boolean;
   layeredDirection?: LayeredDirection;
+  layeredSpacing?: LayeredSpacing;
   radialCenterNode?: string | null;
   applyNoverlap?: boolean;
 }
@@ -623,6 +624,12 @@ function clampNodesToBounds(graph: Graph, bounds: Bounds): void {
   });
 }
 
+const layeredSpacingPresets = {
+  compact: { nodesep: 75, ranksep: 100, margin: 50 },
+  balanced: { nodesep: 150, ranksep: 200, margin: 80 },
+  spacious: { nodesep: 250, ranksep: 350, margin: 120 },
+};
+
 /**
  * Apply layered (Sugiyama) layout using dagre
  * Minimizes edge crossings by arranging nodes in layers
@@ -632,18 +639,25 @@ export function applyLayeredLayout(
   graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
   options: LayoutOptions = {}
 ): void {
-  const { layeredDirection = 'LR' } = options;
+  const { layeredDirection = 'LR', layeredSpacing = 'balanced' } = options;
 
   if (graph.order === 0) return;
+
+  // Get spacing preset
+  const preset = layeredSpacingPresets[layeredSpacing];
+
+  // Apply dynamic scaling based on graph size
+  const nodeCount = graph.order;
+  const scaleFactor = Math.min(1.5, 1.0 + Math.log10(Math.max(nodeCount / 100, 1)) * 0.5);
 
   // Create a dagre graph
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setGraph({
     rankdir: layeredDirection,
-    nodesep: 50,
-    ranksep: 100,
-    marginx: 50,
-    marginy: 50,
+    nodesep: preset.nodesep * scaleFactor,
+    ranksep: preset.ranksep * scaleFactor,
+    marginx: preset.margin,
+    marginy: preset.margin,
   });
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 

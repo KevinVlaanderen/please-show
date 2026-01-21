@@ -11,6 +11,7 @@ export function useApplyLayout() {
   const graph = useAppStore((state) => state.graph);
   const layoutAlgorithm = useLayoutStore((state) => state.layoutAlgorithm);
   const layeredDirection = useLayoutStore((state) => state.layeredDirection);
+  const layeredSpacing = useLayoutStore((state) => state.layeredSpacing);
   const radialCenterNode = useLayoutStore((state) => state.radialCenterNode);
   const applyNoverlap = useLayoutStore((state) => state.applyNoverlap);
   const clusteringStrength = useLayoutStore((state) => state.clusteringStrength);
@@ -35,11 +36,12 @@ export function useApplyLayout() {
       quality: layoutQuality,
       dissuadeHubs,
       layeredDirection,
+      layeredSpacing,
       radialCenterNode,
       applyNoverlap,
     });
 
     // Signal that layout is complete so hulls can be recomputed
     incrementHullVersion();
-  }, [graph, layoutAlgorithm, layeredDirection, radialCenterNode, applyNoverlap, clusteringStrength, layoutVersion, layoutQuality, dissuadeHubs, incrementHullVersion]);
+  }, [graph, layoutAlgorithm, layeredDirection, layeredSpacing, radialCenterNode, applyNoverlap, clusteringStrength, layoutVersion, layoutQuality, dissuadeHubs, incrementHullVersion]);
 }

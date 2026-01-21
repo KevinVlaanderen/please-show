@@ -1,5 +1,5 @@
 import { useDisplayStore, type ColorScheme } from '../../stores/displayStore';
-import { useLayoutStore, type LayoutAlgorithm, type LayoutQuality, type LayeredDirection, type ClusteringStrength } from '../../stores/layoutStore';
+import { useLayoutStore, type LayoutAlgorithm, type LayoutQuality, type LayeredDirection, type LayeredSpacing, type ClusteringStrength } from '../../stores/layoutStore';
 import { useUIStore } from '../../stores/uiStore';
 
 const COLOR_SCHEMES: { value: ColorScheme; label: string; description: string }[] = [
@@ -24,6 +24,12 @@ const LAYERED_DIRECTIONS: { value: LayeredDirection; label: string }[] = [
   { value: 'BT', label: 'Bottom → Top' },
 ];
 
+const LAYERED_SPACING_OPTIONS: { value: LayeredSpacing; label: string }[] = [
+  { value: 'compact', label: 'Compact' },
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'spacious', label: 'Spacious' },
+];
+
 const CLUSTERING_OPTIONS: { value: ClusteringStrength; label: string }[] = [
   { value: 'weak', label: 'Loose clustering' },
   { value: 'strong', label: 'Tight clustering' },
@@ -43,6 +49,8 @@ export function DisplayOptionsPanel() {
   const setLayoutAlgorithm = useLayoutStore((state) => state.setLayoutAlgorithm);
   const layeredDirection = useLayoutStore((state) => state.layeredDirection);
   const setLayeredDirection = useLayoutStore((state) => state.setLayeredDirection);
+  const layeredSpacing = useLayoutStore((state) => state.layeredSpacing);
+  const setLayeredSpacing = useLayoutStore((state) => state.setLayeredSpacing);
   const radialCenterNode = useLayoutStore((state) => state.radialCenterNode);
   const setRadialCenterNode = useLayoutStore((state) => state.setRadialCenterNode);
   const applyNoverlap = useLayoutStore((state) => state.applyNoverlap);
@@ -158,6 +166,25 @@ export function DisplayOptionsPanel() {
                 </option>
               ))}
             </select>
+            <label className="text-xs text-slate-500 block mb-1 mt-3">Spacing</label>
+            <div className="space-y-1">
+              {LAYERED_SPACING_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1"
+                >
+                  <input
+                    type="radio"
+                    name="layeredSpacing"
+                    value={option.value}
+                    checked={layeredSpacing === option.value}
+                    onChange={() => setLayeredSpacing(option.value)}
+                    className="text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-slate-700">{option.label}</span>
+                </label>
+              ))}
+            </div>
           </div>
         )}
 

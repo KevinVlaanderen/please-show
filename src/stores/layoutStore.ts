@@ -5,10 +5,12 @@ export type ClusteringStrength = 'weak' | 'strong';
 export type LayoutQuality = 'fast' | 'balanced' | 'quality';
 export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'hierarchical' | 'layered' | 'radial' | 'circular';
 export type LayeredDirection = 'TB' | 'LR' | 'BT' | 'RL';
+export type LayeredSpacing = 'compact' | 'balanced' | 'spacious';
 
 interface LayoutState {
   layoutAlgorithm: LayoutAlgorithm;
   layeredDirection: LayeredDirection;
+  layeredSpacing: LayeredSpacing;
   radialCenterNode: string | null;
   applyNoverlap: boolean;
   // Legacy settings (kept for backwards compatibility and some algorithms)
@@ -23,6 +25,7 @@ interface LayoutState {
   edgeBundling: boolean;
   setLayoutAlgorithm: (algorithm: LayoutAlgorithm) => void;
   setLayeredDirection: (direction: LayeredDirection) => void;
+  setLayeredSpacing: (spacing: LayeredSpacing) => void;
   setRadialCenterNode: (nodeId: string | null) => void;
   setApplyNoverlap: (enabled: boolean) => void;
   setClusterByPackage: (enabled: boolean) => void;
@@ -54,6 +57,7 @@ export const useLayoutStore = create<LayoutState>()(
     (set) => ({
       layoutAlgorithm: 'clusteredForceAtlas2',
       layeredDirection: 'LR',
+      layeredSpacing: 'balanced',
       radialCenterNode: null,
       applyNoverlap: false,
       clusterByPackage: true,
@@ -67,6 +71,7 @@ export const useLayoutStore = create<LayoutState>()(
       edgeBundling: true,
       setLayoutAlgorithm: (algorithm) => set({ layoutAlgorithm: algorithm }),
       setLayeredDirection: (direction) => set({ layeredDirection: direction }),
+      setLayeredSpacing: (spacing) => set({ layeredSpacing: spacing }),
       setRadialCenterNode: (nodeId) => set({ radialCenterNode: nodeId }),
       setApplyNoverlap: (enabled) => set({ applyNoverlap: enabled }),
       setClusterByPackage: (enabled) => set({ clusterByPackage: enabled }),
@@ -84,6 +89,7 @@ export const useLayoutStore = create<LayoutState>()(
       partialize: (state) => ({
         layoutAlgorithm: state.layoutAlgorithm,
         layeredDirection: state.layeredDirection,
+        layeredSpacing: state.layeredSpacing,
         applyNoverlap: state.applyNoverlap,
         clusterByPackage: state.clusterByPackage,
         clusteringStrength: state.clusteringStrength,
