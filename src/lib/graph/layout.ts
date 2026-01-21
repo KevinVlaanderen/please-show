@@ -1,13 +1,15 @@
 import Graph from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import { circular } from 'graphology-layout';
+import noverlap from 'graphology-layout-noverlap';
 import { topologicalGenerations } from 'graphology-dag';
+import dagre from '@dagrejs/dagre';
 import type { GraphNodeAttributes, GraphEdgeAttributes, PackageTreeNode, Bounds } from '../../types/graph';
-import type { ClusteringStrength, LayoutQuality } from '../../stores/layoutStore';
+import type { ClusteringStrength, LayoutQuality, LayeredDirection } from '../../stores/layoutStore';
 import { buildPackageTree, computePackageAverageLayer } from './packageTree';
 import { applyTreemapToPackageTree, padBounds } from './treemap';
 
-export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'hierarchical' | 'circular' | 'random';
+export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'hierarchical' | 'layered' | 'radial' | 'circular' | 'random';
 
 interface LayoutOptions {
   iterations?: number;
@@ -15,6 +17,9 @@ interface LayoutOptions {
   quality?: LayoutQuality;
   dissuadeHubs?: boolean;
   hierarchical?: boolean;
+  layeredDirection?: LayeredDirection;
+  radialCenterNode?: string | null;
+  applyNoverlap?: boolean;
 }
 
 const qualityPresets = {
@@ -619,6 +624,172 @@ function clampNodesToBounds(graph: Graph, bounds: Bounds): void {
 }
 
 /**
+ * Apply layered (Sugiyama) layout using dagre
+ * Minimizes edge crossings by arranging nodes in layers
+ * Good for DAG-style dependency graphs
+ */
+export function applyLayeredLayout(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
+  options: LayoutOptions = {}
+): void {
+  const { layeredDirection = 'LR' } = options;
+
+  if (graph.order === 0) return;
+
+  // Create a dagre graph
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setGraph({
+    rankdir: layeredDirection,
+    nodesep: 50,
+    ranksep: 100,
+    marginx: 50,
+    marginy: 50,
+  });
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  // Add nodes to dagre graph
+  graph.forEachNode((nodeId, attrs) => {
+    const size = attrs.size || 10;
+    dagreGraph.setNode(nodeId, {
+      width: size * 4,
+      height: size * 4,
+    });
+  });
+
+  // Add edges to dagre graph
+  graph.forEachEdge((_, __, source, target) => {
+    dagreGraph.setEdge(source, target);
+  });
+
+  // Run dagre layout
+  dagre.layout(dagreGraph);
+
+  // Apply positions back to graphology graph
+  graph.forEachNode((nodeId) => {
+    const dagreNode = dagreGraph.node(nodeId);
+    if (dagreNode) {
+      graph.setNodeAttribute(nodeId, 'x', dagreNode.x);
+      graph.setNodeAttribute(nodeId, 'y', dagreNode.y);
+    }
+  });
+}
+
+/**
+ * Apply radial layout - arranges nodes in concentric circles from a center node
+ * Uses BFS to determine distance from center
+ * Good for exploring dependencies from a specific target
+ */
+export function applyRadialLayout(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
+  options: LayoutOptions = {}
+): void {
+  let { radialCenterNode } = options;
+
+  if (graph.order === 0) return;
+
+  // If no center node specified, find the node with highest degree
+  if (!radialCenterNode || !graph.hasNode(radialCenterNode)) {
+    let maxDegree = -1;
+    graph.forEachNode((nodeId) => {
+      const degree = graph.degree(nodeId);
+      if (degree > maxDegree) {
+        maxDegree = degree;
+        radialCenterNode = nodeId;
+      }
+    });
+  }
+
+  if (!radialCenterNode) return;
+
+  // BFS to compute distances from center
+  const distances = new Map<string, number>();
+  const queue: string[] = [radialCenterNode];
+  distances.set(radialCenterNode, 0);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentDist = distances.get(current)!;
+
+    // Traverse both directions (dependencies and dependents)
+    graph.forEachNeighbor(current, (neighbor) => {
+      if (!distances.has(neighbor)) {
+        distances.set(neighbor, currentDist + 1);
+        queue.push(neighbor);
+      }
+    });
+  }
+
+  // Handle disconnected nodes
+  graph.forEachNode((nodeId) => {
+    if (!distances.has(nodeId)) {
+      distances.set(nodeId, Infinity);
+    }
+  });
+
+  // Group nodes by distance (layer)
+  const layers = new Map<number, string[]>();
+  let maxFiniteLayer = 0;
+
+  distances.forEach((dist, nodeId) => {
+    if (dist !== Infinity) {
+      maxFiniteLayer = Math.max(maxFiniteLayer, dist);
+    }
+    const layerNodes = layers.get(dist) || [];
+    layerNodes.push(nodeId);
+    layers.set(dist, layerNodes);
+  });
+
+  // Place disconnected nodes in outer layer
+  const disconnectedLayer = maxFiniteLayer + 1;
+  const disconnectedNodes = layers.get(Infinity) || [];
+  if (disconnectedNodes.length > 0) {
+    layers.delete(Infinity);
+    layers.set(disconnectedLayer, disconnectedNodes);
+  }
+
+  // Calculate radii for each layer
+  const baseRadius = 100;
+  const radiusIncrement = Math.max(80, graph.order * 2);
+
+  // Position nodes in concentric circles
+  layers.forEach((nodes, layer) => {
+    if (layer === 0) {
+      // Center node
+      graph.setNodeAttribute(nodes[0], 'x', 0);
+      graph.setNodeAttribute(nodes[0], 'y', 0);
+    } else {
+      const radius = baseRadius + (layer - 1) * radiusIncrement;
+      const angleStep = (2 * Math.PI) / nodes.length;
+
+      nodes.forEach((nodeId, index) => {
+        const angle = index * angleStep - Math.PI / 2;
+        graph.setNodeAttribute(nodeId, 'x', Math.cos(angle) * radius);
+        graph.setNodeAttribute(nodeId, 'y', Math.sin(angle) * radius);
+      });
+    }
+  });
+}
+
+/**
+ * Apply noverlap post-processing to spread apart overlapping nodes
+ * Can be applied after any layout algorithm
+ */
+export function applyNoverlapPostProcess(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>
+): void {
+  if (graph.order === 0) return;
+
+  noverlap.assign(graph, {
+    maxIterations: 150,
+    settings: {
+      margin: 5,
+      ratio: 1.5,
+      speed: 3,
+    },
+  });
+}
+
+/**
  * Apply a named layout algorithm
  */
 export function applyLayout(
@@ -636,11 +807,22 @@ export function applyLayout(
     case 'hierarchical':
       applyHierarchicalLayout(graph, options);
       break;
+    case 'layered':
+      applyLayeredLayout(graph, options);
+      break;
+    case 'radial':
+      applyRadialLayout(graph, options);
+      break;
     case 'circular':
       applyCircularLayout(graph);
       break;
     case 'random':
       applyRandomLayout(graph);
       break;
+  }
+
+  // Apply noverlap post-processing if requested
+  if (options.applyNoverlap) {
+    applyNoverlapPostProcess(graph);
   }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useLayoutStore } from '../stores/layoutStore';
-import { applyLayout, type LayoutAlgorithm } from '../lib/graph/layout';
+import { applyLayout } from '../lib/graph/layout';
 
 /**
  * Hook to apply layout to the graph based on layout settings
@@ -9,9 +9,11 @@ import { applyLayout, type LayoutAlgorithm } from '../lib/graph/layout';
  */
 export function useApplyLayout() {
   const graph = useAppStore((state) => state.graph);
-  const clusterByPackage = useLayoutStore((state) => state.clusterByPackage);
+  const layoutAlgorithm = useLayoutStore((state) => state.layoutAlgorithm);
+  const layeredDirection = useLayoutStore((state) => state.layeredDirection);
+  const radialCenterNode = useLayoutStore((state) => state.radialCenterNode);
+  const applyNoverlap = useLayoutStore((state) => state.applyNoverlap);
   const clusteringStrength = useLayoutStore((state) => state.clusteringStrength);
-  const hierarchicalLayout = useLayoutStore((state) => state.hierarchicalLayout);
   const layoutVersion = useLayoutStore((state) => state.layoutVersion);
   const layoutQuality = useLayoutStore((state) => state.layoutQuality);
   const dissuadeHubs = useLayoutStore((state) => state.dissuadeHubs);
@@ -28,24 +30,16 @@ export function useApplyLayout() {
 
     graphRef.current = graph;
 
-    // Determine algorithm based on settings
-    // Hierarchical takes precedence if both are enabled
-    let algorithm: LayoutAlgorithm;
-    if (clusterByPackage && hierarchicalLayout) {
-      algorithm = 'hierarchical';
-    } else if (clusterByPackage) {
-      algorithm = 'clusteredForceAtlas2';
-    } else {
-      algorithm = 'forceAtlas2';
-    }
-
-    applyLayout(graph, algorithm, {
+    applyLayout(graph, layoutAlgorithm, {
       clusteringStrength,
       quality: layoutQuality,
       dissuadeHubs,
+      layeredDirection,
+      radialCenterNode,
+      applyNoverlap,
     });
 
     // Signal that layout is complete so hulls can be recomputed
     incrementHullVersion();
-  }, [graph, clusterByPackage, clusteringStrength, hierarchicalLayout, layoutVersion, layoutQuality, dissuadeHubs, incrementHullVersion]);
+  }, [graph, layoutAlgorithm, layeredDirection, radialCenterNode, applyNoverlap, clusteringStrength, layoutVersion, layoutQuality, dissuadeHubs, incrementHullVersion]);
 }
