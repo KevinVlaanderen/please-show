@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface FilterState {
   // Disabled items (explicit disabled set model)
@@ -17,11 +18,13 @@ interface FilterState {
   clearFilters: () => void;
 }
 
-export const useFilterStore = create<FilterState>((set) => ({
-  disabledPackages: [],
-  disabledLabels: [],
-  showBinaryOnly: false,
-  hideIsolatedNodes: false,
+export const useFilterStore = create<FilterState>()(
+  persist(
+    (set) => ({
+      disabledPackages: [],
+      disabledLabels: [],
+      showBinaryOnly: false,
+      hideIsolatedNodes: false,
 
   setDisabledPackages: (packages) => set({ disabledPackages: packages }),
 
@@ -70,4 +73,15 @@ export const useFilterStore = create<FilterState>((set) => ({
       showBinaryOnly: false,
       hideIsolatedNodes: false,
     }),
-}));
+    }),
+    {
+      name: 'please-show-filters',
+      partialize: (state) => ({
+        disabledPackages: state.disabledPackages,
+        disabledLabels: state.disabledLabels,
+        showBinaryOnly: state.showBinaryOnly,
+        hideIsolatedNodes: state.hideIsolatedNodes,
+      }),
+    }
+  )
+);
