@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type ClusteringStrength = 'weak' | 'strong';
 export type LayoutQuality = 'fast' | 'balanced' | 'quality';
-export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'hierarchical' | 'layered' | 'radial' | 'circular';
+export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'hierarchical' | 'layered' | 'radial' | 'circular' | 'stress';
 export type LayeredDirection = 'TB' | 'LR' | 'BT' | 'RL';
 export type LayeredSpacing = 'compact' | 'balanced' | 'spacious';
 
@@ -23,6 +23,9 @@ interface LayoutState {
   layoutQuality: LayoutQuality;
   dissuadeHubs: boolean;
   edgeBundling: boolean;
+  edgeOptimization: boolean;
+  edgeWeightInfluence: number;
+  neighborGravity: number;
   setLayoutAlgorithm: (algorithm: LayoutAlgorithm) => void;
   setLayeredDirection: (direction: LayeredDirection) => void;
   setLayeredSpacing: (spacing: LayeredSpacing) => void;
@@ -37,6 +40,9 @@ interface LayoutState {
   setLayoutQuality: (quality: LayoutQuality) => void;
   setDissuadeHubs: (enabled: boolean) => void;
   setEdgeBundling: (enabled: boolean) => void;
+  setEdgeOptimization: (enabled: boolean) => void;
+  setEdgeWeightInfluence: (value: number) => void;
+  setNeighborGravity: (value: number) => void;
 }
 
 // Migration function to derive layoutAlgorithm from legacy settings
@@ -69,6 +75,9 @@ export const useLayoutStore = create<LayoutState>()(
       layoutQuality: 'balanced',
       dissuadeHubs: true,
       edgeBundling: true,
+      edgeOptimization: true,
+      edgeWeightInfluence: 2,
+      neighborGravity: 0,
       setLayoutAlgorithm: (algorithm) => set({ layoutAlgorithm: algorithm }),
       setLayeredDirection: (direction) => set({ layeredDirection: direction }),
       setLayeredSpacing: (spacing) => set({ layeredSpacing: spacing }),
@@ -83,6 +92,9 @@ export const useLayoutStore = create<LayoutState>()(
       setLayoutQuality: (quality) => set({ layoutQuality: quality }),
       setDissuadeHubs: (enabled) => set({ dissuadeHubs: enabled }),
       setEdgeBundling: (enabled) => set({ edgeBundling: enabled }),
+      setEdgeOptimization: (enabled) => set({ edgeOptimization: enabled }),
+      setEdgeWeightInfluence: (value) => set({ edgeWeightInfluence: value }),
+      setNeighborGravity: (value) => set({ neighborGravity: value }),
     }),
     {
       name: 'please-show-layout',
@@ -98,6 +110,9 @@ export const useLayoutStore = create<LayoutState>()(
         layoutQuality: state.layoutQuality,
         dissuadeHubs: state.dissuadeHubs,
         edgeBundling: state.edgeBundling,
+        edgeOptimization: state.edgeOptimization,
+        edgeWeightInfluence: state.edgeWeightInfluence,
+        neighborGravity: state.neighborGravity,
       }),
       // Migration: derive layoutAlgorithm from legacy settings if not present
       merge: (persisted, current) => {

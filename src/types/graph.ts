@@ -37,6 +37,7 @@ export interface GraphEdgeAttributes {
   curvature?: number;
   type?: 'line' | 'curved';
   originalColor?: string;
+  weight?: number;
 }
 
 // Package cluster for grouped views

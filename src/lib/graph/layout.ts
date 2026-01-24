@@ -9,7 +9,7 @@ import type { ClusteringStrength, LayoutQuality, LayeredDirection, LayeredSpacin
 import { buildPackageTree, computePackageAverageLayer } from './packageTree';
 import { applyTreemapToPackageTree, padBounds } from './treemap';
 
-export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'hierarchical' | 'layered' | 'radial' | 'circular' | 'random';
+export type LayoutAlgorithm = 'forceAtlas2' | 'clusteredForceAtlas2' | 'hierarchical' | 'layered' | 'radial' | 'circular' | 'random' | 'stress';
 
 interface LayoutOptions {
   iterations?: number;
@@ -21,6 +21,9 @@ interface LayoutOptions {
   layeredSpacing?: LayeredSpacing;
   radialCenterNode?: string | null;
   applyNoverlap?: boolean;
+  edgeOptimization?: boolean;
+  edgeWeightInfluence?: number;
+  neighborGravity?: number;
 }
 
 const qualityPresets = {
@@ -37,6 +40,272 @@ interface PackageInfo {
 }
 
 /**
+ * Compute adaptive edge weights based on node degrees
+ * Low-degree nodes get higher edge weights to pull them closer to neighbors
+ */
+function computeAdaptiveEdgeWeights(
+  graph: Graph
+): void {
+  graph.forEachEdge((edgeId, _, source, target) => {
+    const sourceDegree = graph.degree(source);
+    const targetDegree = graph.degree(target);
+
+    // Harmonic mean of degrees
+    const harmonicDegree = (2 * sourceDegree * targetDegree) / (sourceDegree + targetDegree);
+
+    // Weight inversely proportional to degree (low-degree = high weight)
+    // Range: 1-11 (degree 1 = weight 11, degree 10+ = weight ~2)
+    const weight = 1 + (10 / Math.max(harmonicDegree, 1));
+
+    graph.setEdgeAttribute(edgeId, 'weight', weight);
+  });
+}
+
+/**
+ * Refine node positions by pulling them toward their neighbor centroids
+ * Favors low-degree nodes and decreases strength over iterations
+ */
+function refineNodePositions(
+  graph: Graph,
+  iterations = 15
+): void {
+  for (let iter = 0; iter < iterations; iter++) {
+    // Strength decreases over iterations for convergence
+    const convergenceFactor = 1 - iter / iterations;
+
+    // Compute new positions for all nodes
+    const updates = new Map<string, { x: number; y: number }>();
+
+    graph.forEachNode((nodeId) => {
+      const neighbors = graph.neighbors(nodeId);
+      if (neighbors.length === 0) {
+        return; // Skip isolated nodes
+      }
+
+      // Compute centroid of neighbors
+      let centroidX = 0;
+      let centroidY = 0;
+      for (const neighbor of neighbors) {
+        centroidX += graph.getNodeAttribute(neighbor, 'x');
+        centroidY += graph.getNodeAttribute(neighbor, 'y');
+      }
+      centroidX /= neighbors.length;
+      centroidY /= neighbors.length;
+
+      // Current position
+      const x = graph.getNodeAttribute(nodeId, 'x');
+      const y = graph.getNodeAttribute(nodeId, 'y');
+
+      // Strength based on degree (favor low-degree nodes)
+      const degree = graph.degree(nodeId);
+      const degreeStrength = 1 / Math.sqrt(Math.max(degree, 1));
+
+      // Overall strength
+      const strength = 0.3 * degreeStrength * convergenceFactor;
+
+      // Move toward centroid
+      const newX = x + (centroidX - x) * strength;
+      const newY = y + (centroidY - y) * strength;
+
+      updates.set(nodeId, { x: newX, y: newY });
+    });
+
+    // Apply updates
+    for (const [nodeId, pos] of updates) {
+      graph.setNodeAttribute(nodeId, 'x', pos.x);
+      graph.setNodeAttribute(nodeId, 'y', pos.y);
+    }
+  }
+}
+
+/**
+ * Apply neighbor gravity forces to pull nodes toward their neighbor centroids
+ * Strength is proportional to user setting and inversely proportional to degree
+ */
+function applyNeighborGravityForces(
+  graph: Graph,
+  strength: number
+): void {
+  if (strength <= 0) return;
+
+  // Compute new positions for all nodes
+  const updates = new Map<string, { x: number; y: number }>();
+
+  graph.forEachNode((nodeId) => {
+    const neighbors = graph.neighbors(nodeId);
+    if (neighbors.length === 0) {
+      return; // Skip isolated nodes
+    }
+
+    // Compute centroid of neighbors
+    let centroidX = 0;
+    let centroidY = 0;
+    for (const neighbor of neighbors) {
+      centroidX += graph.getNodeAttribute(neighbor, 'x');
+      centroidY += graph.getNodeAttribute(neighbor, 'y');
+    }
+    centroidX /= neighbors.length;
+    centroidY /= neighbors.length;
+
+    // Current position
+    const x = graph.getNodeAttribute(nodeId, 'x');
+    const y = graph.getNodeAttribute(nodeId, 'y');
+
+    // Strength based on degree (favor low-degree nodes)
+    const degree = graph.degree(nodeId);
+    const degreeStrength = 1 / Math.sqrt(Math.max(degree, 1));
+
+    // Overall strength
+    const effectiveStrength = strength * degreeStrength * 0.5;
+
+    // Move toward centroid
+    const newX = x + (centroidX - x) * effectiveStrength;
+    const newY = y + (centroidY - y) * effectiveStrength;
+
+    updates.set(nodeId, { x: newX, y: newY });
+  });
+
+  // Apply updates
+  for (const [nodeId, pos] of updates) {
+    graph.setNodeAttribute(nodeId, 'x', pos.x);
+    graph.setNodeAttribute(nodeId, 'y', pos.y);
+  }
+}
+
+/**
+ * Compute all-pairs shortest path distances using BFS
+ * Returns a map from node ID to map of (target ID -> distance)
+ */
+function computeAllPairsDistances(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>
+): Map<string, Map<string, number>> {
+  const allDistances = new Map<string, Map<string, number>>();
+
+  // BFS from each node
+  graph.forEachNode((startNode) => {
+    const distances = new Map<string, number>();
+    const queue: string[] = [startNode];
+    distances.set(startNode, 0);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const currentDist = distances.get(current)!;
+
+      // Traverse both directions (neighbors)
+      graph.forEachNeighbor(current, (neighbor) => {
+        if (!distances.has(neighbor)) {
+          distances.set(neighbor, currentDist + 1);
+          queue.push(neighbor);
+        }
+      });
+    }
+
+    // Handle disconnected nodes (set distance to Infinity)
+    graph.forEachNode((nodeId) => {
+      if (!distances.has(nodeId)) {
+        distances.set(nodeId, Infinity);
+      }
+    });
+
+    allDistances.set(startNode, distances);
+  });
+
+  return allDistances;
+}
+
+/**
+ * Apply stress majorization layout algorithm
+ * Minimizes the difference between graph distances and euclidean distances
+ * Good for clear structure visualization, but O(n²) - slow for large graphs
+ */
+function applyStressMajorizationLayout(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
+  options: LayoutOptions = {}
+): void {
+  const { iterations = 100 } = options;
+
+  if (graph.order === 0) return;
+
+  // Compute all-pairs shortest path distances
+  const graphDistances = computeAllPairsDistances(graph);
+
+  // Initialize with random positions in 500x500 space
+  graph.forEachNode((nodeId) => {
+    graph.setNodeAttribute(nodeId, 'x', Math.random() * 500 - 250);
+    graph.setNodeAttribute(nodeId, 'y', Math.random() * 500 - 250);
+  });
+
+  const nodes = graph.nodes();
+  const scalingFactor = 50; // Distance unit in pixels
+
+  // Stress majorization iterations
+  for (let iter = 0; iter < iterations; iter++) {
+    const newPositions = new Map<string, { x: number; y: number }>();
+
+    // For each node, compute weighted average position
+    for (const nodeId of nodes) {
+      const nodeDistances = graphDistances.get(nodeId)!;
+
+      let weightedSumX = 0;
+      let weightedSumY = 0;
+      let totalWeight = 0;
+
+      for (const otherId of nodes) {
+        if (nodeId === otherId) continue;
+
+        const graphDist = nodeDistances.get(otherId)!;
+        if (graphDist === Infinity) continue; // Skip disconnected nodes
+
+        // Current euclidean distance
+        const x1 = graph.getNodeAttribute(nodeId, 'x');
+        const y1 = graph.getNodeAttribute(nodeId, 'y');
+        const x2 = graph.getNodeAttribute(otherId, 'x');
+        const y2 = graph.getNodeAttribute(otherId, 'y');
+        const euclideanDist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+
+        // Weight by 1 / (graphDistance^2) to emphasize nearby nodes
+        const weight = 1 / (graphDist * graphDist + 0.01); // Add small constant to avoid division by zero
+
+        // Target euclidean distance = graphDistance * scalingFactor
+        const targetDist = graphDist * scalingFactor;
+
+        // If nodes are too close, use current position
+        if (euclideanDist < 1) {
+          weightedSumX += weight * x2;
+          weightedSumY += weight * y2;
+        } else {
+          // Move toward target distance
+          const ratio = targetDist / euclideanDist;
+          weightedSumX += weight * (x1 + (x2 - x1) * ratio);
+          weightedSumY += weight * (y1 + (y2 - y1) * ratio);
+        }
+
+        totalWeight += weight;
+      }
+
+      if (totalWeight > 0) {
+        newPositions.set(nodeId, {
+          x: weightedSumX / totalWeight,
+          y: weightedSumY / totalWeight,
+        });
+      } else {
+        // No connected nodes, keep current position
+        newPositions.set(nodeId, {
+          x: graph.getNodeAttribute(nodeId, 'x'),
+          y: graph.getNodeAttribute(nodeId, 'y'),
+        });
+      }
+    }
+
+    // Apply new positions
+    for (const [nodeId, pos] of newPositions) {
+      graph.setNodeAttribute(nodeId, 'x', pos.x);
+      graph.setNodeAttribute(nodeId, 'y', pos.y);
+    }
+  }
+}
+
+/**
  * Two-phase clustered layout:
  * 1. Create a meta-graph of packages and position them using ForceAtlas2
  * 2. Arrange nodes within each package, then translate to package position
@@ -49,6 +318,9 @@ function applyClusteredForceAtlas2(
     clusteringStrength = 'weak',
     quality = 'balanced',
     dissuadeHubs = true,
+    edgeOptimization = false,
+    edgeWeightInfluence = 2,
+    neighborGravity = 0,
   } = options;
   const preset = qualityPresets[quality];
   const iterations = options.iterations ?? preset.iterations;
@@ -98,23 +370,66 @@ function applyClusteredForceAtlas2(
     }
   }
 
+  // Apply adaptive edge weights to meta-graph if optimization enabled
+  if (edgeOptimization) {
+    // Compute weights based on package node counts (similar to degree-based weighting)
+    metaGraph.forEachEdge((edgeId, _, source, target) => {
+      const sourceNodes = packageNodes.get(source)?.length || 1;
+      const targetNodes = packageNodes.get(target)?.length || 1;
+      const harmonicSize = (2 * sourceNodes * targetNodes) / (sourceNodes + targetNodes);
+      const weight = 1 + (10 / Math.max(harmonicSize, 1));
+      metaGraph.setEdgeAttribute(edgeId, 'weight', weight);
+    });
+  }
+
   // Run ForceAtlas2 on the meta-graph to position packages
   const metaIterations = Math.max(75, Math.round(iterations * 0.75));
-  forceAtlas2.assign(metaGraph, {
-    iterations: metaIterations,
-    settings: {
-      gravity: 0.5,
-      scalingRatio: 50,
-      strongGravityMode: false,
-      linLogMode: true,
-      barnesHutOptimize: packages.length > 50,
-      barnesHutTheta: preset.barnesHutTheta,
-      adjustSizes: true,
-      edgeWeightInfluence: 1,
-      slowDown: 1,
-      outboundAttractionDistribution: dissuadeHubs,
-    },
-  });
+
+  // If neighbor gravity is enabled, run in batches
+  if (neighborGravity > 0) {
+    const batchSize = 15;
+    const batches = Math.ceil(metaIterations / batchSize);
+
+    for (let i = 0; i < batches; i++) {
+      const iters = Math.min(batchSize, metaIterations - i * batchSize);
+
+      forceAtlas2.assign(metaGraph, {
+        iterations: iters,
+        settings: {
+          gravity: 0.5,
+          scalingRatio: 50,
+          strongGravityMode: false,
+          linLogMode: true,
+          barnesHutOptimize: packages.length > 50,
+          barnesHutTheta: preset.barnesHutTheta,
+          adjustSizes: true,
+          edgeWeightInfluence: edgeOptimization ? edgeWeightInfluence : 1,
+          slowDown: 1,
+          outboundAttractionDistribution: dissuadeHubs,
+        },
+      });
+
+      // Apply neighbor gravity to meta-graph
+      applyNeighborGravityForces(metaGraph, neighborGravity);
+    }
+  } else {
+    // Run in single pass
+    forceAtlas2.assign(metaGraph, {
+      iterations: metaIterations,
+      settings: {
+        gravity: 0.5,
+        scalingRatio: 50,
+        strongGravityMode: false,
+        linLogMode: true,
+        barnesHutOptimize: packages.length > 50,
+        barnesHutTheta: preset.barnesHutTheta,
+        adjustSizes: true,
+        edgeWeightInfluence: edgeOptimization ? edgeWeightInfluence : 1,
+        slowDown: 1,
+        outboundAttractionDistribution: dissuadeHubs,
+      },
+    });
+  }
 
   // Extract package positions and calculate appropriate radii
   const packageInfo = new Map<string, PackageInfo>();
@@ -156,28 +471,74 @@ function applyClusteredForceAtlas2(
 
     // Add only internal edges (within the package)
     for (const nodeId of nodes) {
-      graph.forEachOutEdge(nodeId, (_, __, _source, target) => {
+      graph.forEachOutEdge(nodeId, (edgeId, __, _source, target) => {
         if (nodeSet.has(target) && !subgraph.hasEdge(nodeId, target)) {
-          subgraph.addEdge(nodeId, target);
+          // Copy edge weight from main graph if it exists
+          const weight = graph.getEdgeAttribute(edgeId, 'weight');
+          if (weight !== undefined) {
+            subgraph.addEdge(nodeId, target, { weight });
+          } else {
+            subgraph.addEdge(nodeId, target);
+          }
         }
       });
     }
 
     // Run a light ForceAtlas2 on the subgraph
     if (subgraph.size > 0) {
-      // Has internal edges - use force-directed layout
-      forceAtlas2.assign(subgraph, {
-        iterations: Math.round(iterations * 0.6),
-        settings: {
-          gravity: 1,
-          scalingRatio: 10,
-          strongGravityMode: true,
-          linLogMode: true,
-          adjustSizes: true,
-          slowDown: 2,
-          outboundAttractionDistribution: dissuadeHubs,
-        },
-      });
+      // Apply adaptive edge weights if optimization enabled
+      if (edgeOptimization) {
+        computeAdaptiveEdgeWeights(subgraph);
+      }
+
+      const subgraphIterations = Math.round(iterations * 0.6);
+
+      // If neighbor gravity is enabled, run in batches
+      if (neighborGravity > 0) {
+        const batchSize = 15;
+        const batches = Math.ceil(subgraphIterations / batchSize);
+
+        for (let i = 0; i < batches; i++) {
+          const iters = Math.min(batchSize, subgraphIterations - i * batchSize);
+
+          forceAtlas2.assign(subgraph, {
+            iterations: iters,
+            settings: {
+              gravity: 1,
+              scalingRatio: 10,
+              strongGravityMode: true,
+              linLogMode: true,
+              adjustSizes: true,
+              slowDown: 2,
+              edgeWeightInfluence: edgeOptimization ? edgeWeightInfluence : 1,
+              outboundAttractionDistribution: dissuadeHubs,
+            },
+          });
+
+          // Apply neighbor gravity after each batch
+          applyNeighborGravityForces(subgraph, neighborGravity);
+        }
+      } else {
+        // Has internal edges - use force-directed layout
+        forceAtlas2.assign(subgraph, {
+          iterations: subgraphIterations,
+          settings: {
+            gravity: 1,
+            scalingRatio: 10,
+            strongGravityMode: true,
+            linLogMode: true,
+            adjustSizes: true,
+            slowDown: 2,
+            edgeWeightInfluence: edgeOptimization ? edgeWeightInfluence : 1,
+            outboundAttractionDistribution: dissuadeHubs,
+          },
+        });
+      }
+
+      // Apply refinement if optimization enabled
+      if (edgeOptimization) {
+        refineNodePositions(subgraph, 10); // Fewer iterations for subgraphs
+      }
     } else {
       // No internal edges - arrange in a circle or grid
       if (nodes.length <= 8) {
@@ -251,25 +612,71 @@ export function applyForceAtlas2(
   graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
   options: LayoutOptions = {}
 ): void {
-  const { quality = 'balanced', dissuadeHubs = true } = options;
+  const {
+    quality = 'balanced',
+    dissuadeHubs = true,
+    edgeOptimization = false,
+    edgeWeightInfluence = 2,
+    neighborGravity = 0,
+  } = options;
   const preset = qualityPresets[quality];
   const iterations = options.iterations ?? preset.iterations;
 
-  forceAtlas2.assign(graph, {
-    iterations,
-    settings: {
-      gravity: 1,
-      scalingRatio: 10,
-      strongGravityMode: false,
-      barnesHutOptimize: graph.order > 500,
-      barnesHutTheta: preset.barnesHutTheta,
-      adjustSizes: true,
-      linLogMode: true,
-      outboundAttractionDistribution: dissuadeHubs,
-      edgeWeightInfluence: 1,
-      slowDown: 1,
-    },
-  });
+  // Apply adaptive edge weights if optimization enabled
+  if (edgeOptimization) {
+    computeAdaptiveEdgeWeights(graph);
+  }
+
+  // If neighbor gravity is enabled, run ForceAtlas2 in batches
+  if (neighborGravity > 0) {
+    const batchSize = 15;
+    const batches = Math.ceil(iterations / batchSize);
+
+    for (let i = 0; i < batches; i++) {
+      const iters = Math.min(batchSize, iterations - i * batchSize);
+
+      forceAtlas2.assign(graph, {
+        iterations: iters,
+        settings: {
+          gravity: 1,
+          scalingRatio: 10,
+          strongGravityMode: false,
+          barnesHutOptimize: graph.order > 500,
+          barnesHutTheta: preset.barnesHutTheta,
+          adjustSizes: true,
+          linLogMode: true,
+          outboundAttractionDistribution: dissuadeHubs,
+          edgeWeightInfluence: edgeOptimization ? edgeWeightInfluence : 1,
+          slowDown: 1,
+        },
+      });
+
+      // Apply neighbor gravity after each batch
+      applyNeighborGravityForces(graph, neighborGravity);
+    }
+  } else {
+    // Run ForceAtlas2 in single pass
+    forceAtlas2.assign(graph, {
+      iterations,
+      settings: {
+        gravity: 1,
+        scalingRatio: 10,
+        strongGravityMode: false,
+        barnesHutOptimize: graph.order > 500,
+        barnesHutTheta: preset.barnesHutTheta,
+        adjustSizes: true,
+        linLogMode: true,
+        outboundAttractionDistribution: dissuadeHubs,
+        edgeWeightInfluence: edgeOptimization ? edgeWeightInfluence : 1,
+        slowDown: 1,
+      },
+    });
+  }
+
+  // Apply refinement if optimization enabled
+  if (edgeOptimization) {
+    refineNodePositions(graph);
+  }
 }
 
 /**
@@ -313,6 +720,9 @@ function applyHierarchicalLayout(
   const {
     quality = 'balanced',
     dissuadeHubs = true,
+    edgeOptimization = false,
+    edgeWeightInfluence = 2,
+    neighborGravity = 0,
   } = options;
   const preset = qualityPresets[quality];
   const iterations = options.iterations ?? preset.iterations;
@@ -353,7 +763,7 @@ function applyHierarchicalLayout(
   );
 
   // Phase 4: Position nodes within their package bounds
-  positionNodesInPackages(graph, packageTree, nodeToLayer, iterations, preset.barnesHutTheta, dissuadeHubs);
+  positionNodesInPackages(graph, packageTree, nodeToLayer, iterations, preset.barnesHutTheta, dissuadeHubs, edgeOptimization, edgeWeightInfluence, neighborGravity);
 }
 
 /**
@@ -391,10 +801,13 @@ function positionNodesInPackages(
   nodeToLayer: Map<string, number>,
   iterations: number,
   barnesHutTheta: number,
-  dissuadeHubs: boolean
+  dissuadeHubs: boolean,
+  edgeOptimization = false,
+  edgeWeightInfluence = 2,
+  neighborGravity = 0
 ): void {
   // Process packages depth-first (children first)
-  processPackageNode(graph, packageTree, nodeToLayer, iterations, barnesHutTheta, dissuadeHubs);
+  processPackageNode(graph, packageTree, nodeToLayer, iterations, barnesHutTheta, dissuadeHubs, edgeOptimization, edgeWeightInfluence, neighborGravity);
 }
 
 /**
@@ -406,11 +819,14 @@ function processPackageNode(
   nodeToLayer: Map<string, number>,
   iterations: number,
   barnesHutTheta: number,
-  dissuadeHubs: boolean
+  dissuadeHubs: boolean,
+  edgeOptimization = false,
+  edgeWeightInfluence = 2,
+  neighborGravity = 0
 ): void {
   // First, recursively process children
   for (const child of packageNode.children.values()) {
-    processPackageNode(graph, child, nodeToLayer, iterations, barnesHutTheta, dissuadeHubs);
+    processPackageNode(graph, child, nodeToLayer, iterations, barnesHutTheta, dissuadeHubs, edgeOptimization, edgeWeightInfluence, neighborGravity);
   }
 
   // Then position this package's direct nodes
@@ -485,15 +901,26 @@ function processPackageNode(
 
   // Add only internal edges
   for (const nodeId of nodes) {
-    graph.forEachOutEdge(nodeId, (_, __, _source, target) => {
+    graph.forEachOutEdge(nodeId, (edgeId, __, _source, target) => {
       if (nodeSet.has(target) && !subgraph.hasEdge(nodeId, target)) {
-        subgraph.addEdge(nodeId, target);
+        // Copy edge weight from main graph if it exists
+        const weight = graph.getEdgeAttribute(edgeId, 'weight');
+        if (weight !== undefined) {
+          subgraph.addEdge(nodeId, target, { weight });
+        } else {
+          subgraph.addEdge(nodeId, target);
+        }
       }
     });
   }
 
+  // Apply adaptive edge weights if optimization enabled
+  if (edgeOptimization) {
+    computeAdaptiveEdgeWeights(subgraph);
+  }
+
   // Run bounded ForceAtlas2
-  runBoundedForceAtlas2(subgraph, directNodeBounds, Math.round(iterations * 0.5), barnesHutTheta, dissuadeHubs);
+  runBoundedForceAtlas2(subgraph, directNodeBounds, Math.round(iterations * 0.5), barnesHutTheta, dissuadeHubs, edgeOptimization, edgeWeightInfluence, neighborGravity);
 
   // Copy positions back to main graph
   for (const nodeId of nodes) {
@@ -511,7 +938,10 @@ function runBoundedForceAtlas2(
   bounds: Bounds,
   totalIterations: number,
   barnesHutTheta: number,
-  dissuadeHubs: boolean
+  dissuadeHubs: boolean,
+  edgeOptimization = false,
+  edgeWeightInfluence = 2,
+  neighborGravity = 0
 ): void {
   const nodeCount = subgraph.order;
   if (nodeCount === 0) return;
@@ -526,6 +956,7 @@ function runBoundedForceAtlas2(
         strongGravityMode: true,
         adjustSizes: true,
         linLogMode: true,
+        edgeWeightInfluence: edgeOptimization ? edgeWeightInfluence : 1,
         outboundAttractionDistribution: dissuadeHubs,
       },
     });
@@ -550,14 +981,27 @@ function runBoundedForceAtlas2(
         barnesHutTheta,
         adjustSizes: true,
         linLogMode: true,
+        edgeWeightInfluence: edgeOptimization ? edgeWeightInfluence : 1,
         outboundAttractionDistribution: dissuadeHubs,
       },
     });
+
+    // Apply neighbor gravity if enabled
+    if (neighborGravity > 0) {
+      applyNeighborGravityForces(subgraph, neighborGravity);
+    }
 
     // Apply soft boundary forces
     applyBoundaryForces(subgraph, bounds, 0.3);
 
     // Hard clamp as fallback
+    clampNodesToBounds(subgraph, bounds);
+  }
+
+  // Apply refinement if optimization enabled
+  if (edgeOptimization) {
+    refineNodePositions(subgraph, 10);
+    // Re-clamp after refinement
     clampNodesToBounds(subgraph, bounds);
   }
 }
@@ -832,6 +1276,13 @@ export function applyLayout(
       break;
     case 'random':
       applyRandomLayout(graph);
+      break;
+    case 'stress':
+      applyStressMajorizationLayout(graph, {
+        iterations: options.quality
+          ? Math.round(qualityPresets[options.quality].iterations * 0.67)
+          : options.iterations,
+      });
       break;
   }
 

@@ -13,6 +13,7 @@ const LAYOUT_ALGORITHMS: { value: LayoutAlgorithm; label: string; description: s
   { value: 'clusteredForceAtlas2', label: 'Clustered Force', description: 'Groups by package' },
   { value: 'hierarchical', label: 'Hierarchical', description: 'Nested treemap layout' },
   { value: 'layered', label: 'Layered (Sugiyama)', description: 'Minimizes edge crossings' },
+  { value: 'stress', label: 'Stress Majorization', description: 'Minimizes edge length differences (slow for large graphs)' },
   { value: 'radial', label: 'Radial', description: 'Concentric from center' },
   { value: 'circular', label: 'Circular', description: 'Nodes in a circle' },
 ];
@@ -65,6 +66,10 @@ export function DisplayOptionsPanel() {
   const setDissuadeHubs = useLayoutStore((state) => state.setDissuadeHubs);
   const edgeBundling = useLayoutStore((state) => state.edgeBundling);
   const setEdgeBundling = useLayoutStore((state) => state.setEdgeBundling);
+  const edgeOptimization = useLayoutStore((state) => state.edgeOptimization);
+  const setEdgeOptimization = useLayoutStore((state) => state.setEdgeOptimization);
+  const neighborGravity = useLayoutStore((state) => state.neighborGravity);
+  const setNeighborGravity = useLayoutStore((state) => state.setNeighborGravity);
   const triggerRelayout = useLayoutStore((state) => state.triggerRelayout);
 
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
@@ -257,15 +262,47 @@ export function DisplayOptionsPanel() {
           </label>
 
           {showForceOptions && (
-            <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 mt-1">
-              <input
-                type="checkbox"
-                checked={dissuadeHubs}
-                onChange={(e) => setDissuadeHubs(e.target.checked)}
-                className="text-indigo-600 focus:ring-indigo-500 rounded"
-              />
-              <span className="text-sm text-slate-700">Spread out hubs</span>
-            </label>
+            <>
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 mt-1">
+                <input
+                  type="checkbox"
+                  checked={dissuadeHubs}
+                  onChange={(e) => setDissuadeHubs(e.target.checked)}
+                  className="text-indigo-600 focus:ring-indigo-500 rounded"
+                />
+                <span className="text-sm text-slate-700">Spread out hubs</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-1 mt-1">
+                <input
+                  type="checkbox"
+                  checked={edgeOptimization}
+                  onChange={(e) => setEdgeOptimization(e.target.checked)}
+                  className="text-indigo-600 focus:ring-indigo-500 rounded"
+                />
+                <div>
+                  <span className="text-sm text-slate-700">Optimize edge lengths</span>
+                  <p className="text-xs text-slate-500">Pull low-degree nodes closer to neighbors</p>
+                </div>
+              </label>
+
+              <div className="mt-3 px-1">
+                <label className="text-sm text-slate-600 block mb-1">
+                  Neighbor Attraction: {Math.round(neighborGravity * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={neighborGravity * 100}
+                  onChange={(e) => setNeighborGravity(parseInt(e.target.value) / 100)}
+                  className="w-full"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Pull nodes closer to their immediate neighbors
+                </p>
+              </div>
+            </>
           )}
         </div>
 

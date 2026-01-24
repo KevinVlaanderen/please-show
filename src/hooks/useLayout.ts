@@ -18,6 +18,9 @@ export function useApplyLayout() {
   const layoutVersion = useLayoutStore((state) => state.layoutVersion);
   const layoutQuality = useLayoutStore((state) => state.layoutQuality);
   const dissuadeHubs = useLayoutStore((state) => state.dissuadeHubs);
+  const edgeOptimization = useLayoutStore((state) => state.edgeOptimization);
+  const edgeWeightInfluence = useLayoutStore((state) => state.edgeWeightInfluence);
+  const neighborGravity = useLayoutStore((state) => state.neighborGravity);
   const incrementHullVersion = useLayoutStore((state) => state.incrementHullVersion);
 
   // Track whether we've done initial layout for the current graph
@@ -39,9 +42,12 @@ export function useApplyLayout() {
       layeredSpacing,
       radialCenterNode,
       applyNoverlap,
+      edgeOptimization,
+      edgeWeightInfluence,
+      neighborGravity,
     });
 
     // Signal that layout is complete so hulls can be recomputed
     incrementHullVersion();
-  }, [graph, layoutAlgorithm, layeredDirection, layeredSpacing, radialCenterNode, applyNoverlap, clusteringStrength, layoutVersion, layoutQuality, dissuadeHubs, incrementHullVersion]);
+  }, [graph, layoutAlgorithm, layeredDirection, layeredSpacing, radialCenterNode, applyNoverlap, clusteringStrength, layoutVersion, layoutQuality, dissuadeHubs, edgeOptimization, edgeWeightInfluence, neighborGravity, incrementHullVersion]);
 }
