@@ -5,6 +5,7 @@ interface FilterState {
   disabledPackages: string[];
   disabledLabels: string[];
   showBinaryOnly: boolean;
+  hideIsolatedNodes: boolean;
 
   // Actions
   setDisabledPackages: (packages: string[]) => void;
@@ -12,6 +13,7 @@ interface FilterState {
   setPackagesDisabled: (packages: string[], disabled: boolean) => void;
   setLabelsDisabled: (labels: string[], disabled: boolean) => void;
   setShowBinaryOnly: (show: boolean) => void;
+  setHideIsolatedNodes: (hide: boolean) => void;
   clearFilters: () => void;
 }
 
@@ -19,6 +21,7 @@ export const useFilterStore = create<FilterState>((set) => ({
   disabledPackages: [],
   disabledLabels: [],
   showBinaryOnly: false,
+  hideIsolatedNodes: false,
 
   setDisabledPackages: (packages) => set({ disabledPackages: packages }),
 
@@ -58,10 +61,13 @@ export const useFilterStore = create<FilterState>((set) => ({
 
   setShowBinaryOnly: (show) => set({ showBinaryOnly: show }),
 
+  setHideIsolatedNodes: (hide) => set({ hideIsolatedNodes: hide }),
+
   clearFilters: () =>
     set({
       disabledPackages: [],
       disabledLabels: [],
       showBinaryOnly: false,
+      hideIsolatedNodes: false,
     }),
 }));

@@ -57,14 +57,16 @@ export function FilterPanel() {
     disabledPackages,
     disabledLabels,
     showBinaryOnly,
+    hideIsolatedNodes,
     setDisabledPackages,
     setDisabledLabels,
     setShowBinaryOnly,
+    setHideIsolatedNodes,
     clearFilters,
   } = useFilterStore();
 
   const hasFilters =
-    disabledPackages.length > 0 || disabledLabels.length > 0 || showBinaryOnly;
+    disabledPackages.length > 0 || disabledLabels.length > 0 || showBinaryOnly || hideIsolatedNodes;
 
   const packageTree = useMemo(() => buildTree(packages, '/'), [packages]);
   const labelTree = useMemo(() => buildTree(labels, ':'), [labels]);
@@ -109,6 +111,17 @@ export function FilterPanel() {
           className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
         />
         <span className="text-sm text-slate-700">Binaries only</span>
+      </label>
+
+      {/* Isolated nodes filter */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={hideIsolatedNodes}
+          onChange={(e) => setHideIsolatedNodes(e.target.checked)}
+          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+        />
+        <span className="text-sm text-slate-700">Hide isolated nodes</span>
       </label>
 
       {/* Package filter - hierarchical */}

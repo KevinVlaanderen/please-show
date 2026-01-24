@@ -5,7 +5,7 @@ import { useLayoutStore } from '../stores/layoutStore';
 
 export function useApplyFilters() {
   const graph = useAppStore((state) => state.graph);
-  const { disabledPackages, disabledLabels, showBinaryOnly } = useFilterStore();
+  const { disabledPackages, disabledLabels, showBinaryOnly, hideIsolatedNodes } = useFilterStore();
   const triggerRelayout = useLayoutStore((state) => state.triggerRelayout);
 
   useEffect(() => {
@@ -37,6 +37,12 @@ export function useApplyFilters() {
         visible = false;
       }
 
+      // Isolated nodes filter
+      if (visible && hideIsolatedNodes) {
+        const isIsolated = attrs.inDegree === 0 && attrs.outDegree === 0;
+        if (isIsolated) visible = false;
+      }
+
       graph.setNodeAttribute(nodeId, 'hidden', !visible);
       if (visible) visibleNodes.add(nodeId);
     });
@@ -49,5 +55,5 @@ export function useApplyFilters() {
 
     // Trigger layout recomputation so nodes fill available space
     triggerRelayout();
-  }, [graph, disabledPackages, disabledLabels, showBinaryOnly, triggerRelayout]);
+  }, [graph, disabledPackages, disabledLabels, showBinaryOnly, hideIsolatedNodes, triggerRelayout]);
 }
