@@ -17,14 +17,18 @@ export function AnalysisPanel() {
   const setInspectionMode = useUIStore((state) => state.setInspectionMode);
   const inspectionTransitive = useUIStore((state) => state.inspectionTransitive);
   const setInspectionTransitive = useUIStore((state) => state.setInspectionTransitive);
+  const inspectedNode = useUIStore((state) => state.inspectedNode);
+  const setInspectedNode = useUIStore((state) => state.setInspectedNode);
+  const sourceNode = useUIStore((state) => state.sourceNode);
+  const setSourceNode = useUIStore((state) => state.setSourceNode);
+  const targetNode = useUIStore((state) => state.targetNode);
+  const setTargetNode = useUIStore((state) => state.setTargetNode);
+  const showAllPaths = useUIStore((state) => state.showAllPaths);
+  const setShowAllPaths = useUIStore((state) => state.setShowAllPaths);
 
-  const [inspectedNode, setInspectedNode] = useState('');
-  const [sourceNode, setSourceNode] = useState('');
-  const [targetNode, setTargetNode] = useState('');
   const [pathResult, setPathResult] = useState<string[][] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cycles, setCycles] = useState<string[][] | null>(null);
-  const [showAllPaths, setShowAllPaths] = useState(false);
 
   const handleFindPath = useCallback(() => {
     if (!graph || !sourceNode || !targetNode) return;
@@ -132,10 +136,17 @@ export function AnalysisPanel() {
   useEffect(() => {
     if (selectedNodeId !== null && selectedNodeId !== inspectedNode) {
       setInspectedNode(selectedNodeId);
-    } else if (selectedNodeId === null && inspectedNode) {
-      setInspectedNode('');
     }
-  }, [selectedNodeId, inspectedNode]);
+    // Don't auto-clear inspectedNode when selectedNodeId becomes null
+    // to preserve persisted values. Users can manually clear with the Clear button.
+  }, [selectedNodeId, inspectedNode, setInspectedNode]);
+
+  // On mount/graph load, restore selectedNodeId from persisted inspectedNode
+  useEffect(() => {
+    if (graph && inspectedNode && !selectedNodeId && graph.hasNode(inspectedNode)) {
+      selectNode(inspectedNode);
+    }
+  }, [graph, inspectedNode, selectedNodeId, selectNode]);
 
   // Automatically find path when both fields are filled or when showAllPaths changes
   useEffect(() => {

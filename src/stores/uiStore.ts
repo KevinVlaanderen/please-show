@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface UIState {
   // Panel visibility
@@ -17,6 +18,12 @@ interface UIState {
   // Inspection mode
   inspectionMode: 'both' | 'dependencies' | 'dependents';
   inspectionTransitive: boolean;
+
+  // Analysis nodes
+  inspectedNode: string;
+  sourceNode: string;
+  targetNode: string;
+  showAllPaths: boolean;
 
   // Search
   searchQuery: string;
@@ -38,48 +45,76 @@ interface UIState {
   clearHighlights: () => void;
   setInspectionMode: (mode: 'both' | 'dependencies' | 'dependents') => void;
   setInspectionTransitive: (transitive: boolean) => void;
+  setInspectedNode: (node: string) => void;
+  setSourceNode: (node: string) => void;
+  setTargetNode: (node: string) => void;
+  setShowAllPaths: (show: boolean) => void;
   setSearchQuery: (query: string) => void;
   setSearchOpen: (open: boolean) => void;
   setPickingMode: (mode: 'inspect' | 'source' | 'target' | null, callback: ((nodeId: string) => void) | null) => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
-  sidebarOpen: true,
-  detailsPanelOpen: false,
-  selectedNodeId: null,
-  hoveredNodeId: null,
-  focusedNodeId: null,
-  highlightedPath: [],
-  highlightedCycles: [],
-  inspectionMode: 'both',
-  inspectionTransitive: false,
-  searchQuery: '',
-  searchOpen: false,
-  pickingMode: null,
-  onNodePicked: null,
+export const useUIStore = create<UIState>()(
+  persist(
+    (set) => ({
+      sidebarOpen: true,
+      detailsPanelOpen: false,
+      selectedNodeId: null,
+      hoveredNodeId: null,
+      focusedNodeId: null,
+      highlightedPath: [],
+      highlightedCycles: [],
+      inspectionMode: 'both',
+      inspectionTransitive: false,
+      inspectedNode: '',
+      sourceNode: '',
+      targetNode: '',
+      showAllPaths: false,
+      searchQuery: '',
+      searchOpen: false,
+      pickingMode: null,
+      onNodePicked: null,
 
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-  setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  setDetailsPanelOpen: (open) => set({ detailsPanelOpen: open }),
+      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      setDetailsPanelOpen: (open) => set({ detailsPanelOpen: open }),
 
-  selectNode: (id) =>
-    set({
-      selectedNodeId: id,
-      detailsPanelOpen: id !== null,
+      selectNode: (id) =>
+        set({
+          selectedNodeId: id,
+          detailsPanelOpen: id !== null,
+        }),
+
+      setHoveredNode: (id) => set({ hoveredNodeId: id }),
+      setFocusedNode: (id) => set({ focusedNodeId: id }),
+
+      highlightPath: (path) => set({ highlightedPath: path }),
+      highlightCycles: (cycles) => set({ highlightedCycles: cycles }),
+      clearHighlights: () => set({ highlightedPath: [], highlightedCycles: [] }),
+
+      setInspectionMode: (mode) => set({ inspectionMode: mode }),
+      setInspectionTransitive: (transitive) => set({ inspectionTransitive: transitive }),
+
+      setInspectedNode: (node) => set({ inspectedNode: node }),
+      setSourceNode: (node) => set({ sourceNode: node }),
+      setTargetNode: (node) => set({ targetNode: node }),
+      setShowAllPaths: (show) => set({ showAllPaths: show }),
+
+      setSearchQuery: (query) => set({ searchQuery: query }),
+      setSearchOpen: (open) => set({ searchOpen: open }),
+
+      setPickingMode: (mode, callback) => set({ pickingMode: mode, onNodePicked: callback }),
     }),
-
-  setHoveredNode: (id) => set({ hoveredNodeId: id }),
-  setFocusedNode: (id) => set({ focusedNodeId: id }),
-
-  highlightPath: (path) => set({ highlightedPath: path }),
-  highlightCycles: (cycles) => set({ highlightedCycles: cycles }),
-  clearHighlights: () => set({ highlightedPath: [], highlightedCycles: [] }),
-
-  setInspectionMode: (mode) => set({ inspectionMode: mode }),
-  setInspectionTransitive: (transitive) => set({ inspectionTransitive: transitive }),
-
-  setSearchQuery: (query) => set({ searchQuery: query }),
-  setSearchOpen: (open) => set({ searchOpen: open }),
-
-  setPickingMode: (mode, callback) => set({ pickingMode: mode, onNodePicked: callback }),
-}));
+    {
+      name: 'please-show-analysis',
+      partialize: (state) => ({
+        inspectionMode: state.inspectionMode,
+        inspectionTransitive: state.inspectionTransitive,
+        inspectedNode: state.inspectedNode,
+        sourceNode: state.sourceNode,
+        targetNode: state.targetNode,
+        showAllPaths: state.showAllPaths,
+      }),
+    }
+  )
+);

@@ -40,9 +40,15 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'filters' && <FilterPanel />}
-        {activeTab === 'display' && <DisplayOptionsPanel />}
-        {activeTab === 'analysis' && <AnalysisPanel />}
+        <div className={activeTab === 'filters' ? '' : 'hidden'}>
+          <FilterPanel />
+        </div>
+        <div className={activeTab === 'display' ? '' : 'hidden'}>
+          <DisplayOptionsPanel />
+        </div>
+        <div className={activeTab === 'analysis' ? '' : 'hidden'}>
+          <AnalysisPanel />
+        </div>
       </div>
     </aside>
   );
