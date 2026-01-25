@@ -35,7 +35,9 @@ function drawNodeHover(
   const textWidth = context.measureText(label).width;
   const boxWidth = Math.round(textWidth + 8);
   const boxHeight = Math.round(size + 6);
-  const radius = Math.max(data.size, boxHeight / 2) + 2;
+  // Constant border thickness for all nodes
+  const borderThickness = 3;
+  const radius = data.size + borderThickness;
 
   // Choose halo color based on selected state
   const haloColor = data.selected ? SELECTED_HALO_COLOR : NEIGHBOR_HALO_COLOR;
