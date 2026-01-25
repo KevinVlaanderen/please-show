@@ -15,6 +15,45 @@ export function findShortestPath(
 }
 
 /**
+ * Find all paths between two nodes using DFS.
+ * Only follows edges in the dependent → dependency direction.
+ */
+export function findAllPaths(
+  graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
+  source: string,
+  target: string
+): string[][] {
+  const allPaths: string[][] = [];
+  const currentPath: string[] = [];
+  const visited = new Set<string>();
+
+  function dfs(node: string) {
+    currentPath.push(node);
+    visited.add(node);
+
+    if (node === target) {
+      // Found a path, add a copy to results
+      allPaths.push([...currentPath]);
+    } else {
+      // Explore neighbors (only out direction: dependent → dependency)
+      const neighbors = graph.outNeighbors(node);
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          dfs(neighbor);
+        }
+      }
+    }
+
+    // Backtrack
+    currentPath.pop();
+    visited.delete(node);
+  }
+
+  dfs(source);
+  return allPaths;
+}
+
+/**
  * BFS to find shortest path
  * direction: 'out' follows edges, 'in' goes against edges
  */

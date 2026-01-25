@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
-import { findShortestPath } from '../../lib/analysis/pathFinder';
+import { findShortestPath, findAllPaths } from '../../lib/analysis/pathFinder';
 import { findCycles } from '../../lib/analysis/cycleDetector';
 
 export function AnalysisPanel() {
@@ -15,9 +15,10 @@ export function AnalysisPanel() {
 
   const [sourceNode, setSourceNode] = useState('');
   const [targetNode, setTargetNode] = useState('');
-  const [pathResult, setPathResult] = useState<string[] | null>(null);
+  const [pathResult, setPathResult] = useState<string[][] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cycles, setCycles] = useState<string[][] | null>(null);
+  const [showAllPaths, setShowAllPaths] = useState(false);
 
   const handleFindPath = useCallback(() => {
     if (!graph || !sourceNode || !targetNode) return;
@@ -34,17 +35,33 @@ export function AnalysisPanel() {
       return;
     }
 
-    const path = findShortestPath(graph, sourceNode, targetNode);
-    if (path) {
-      setPathResult(path);
-      highlightPath(path);
-      // Clear node selection when finding a path
-      selectNode(null);
+    if (showAllPaths) {
+      const paths = findAllPaths(graph, sourceNode, targetNode);
+      if (paths.length > 0) {
+        setPathResult(paths);
+        // Collect all unique nodes from all paths
+        const allNodes = new Set<string>();
+        paths.forEach(path => path.forEach(node => allNodes.add(node)));
+        highlightPath(Array.from(allNodes));
+        // Clear node selection when finding a path
+        selectNode(null);
+      } else {
+        setError('No paths found between these nodes');
+        highlightPath([]);
+      }
     } else {
-      setError('No path found between these nodes');
-      highlightPath([]);
+      const path = findShortestPath(graph, sourceNode, targetNode);
+      if (path) {
+        setPathResult([path]);
+        highlightPath(path);
+        // Clear node selection when finding a path
+        selectNode(null);
+      } else {
+        setError('No path found between these nodes');
+        highlightPath([]);
+      }
     }
-  }, [graph, sourceNode, targetNode, highlightPath, setFocusedNode, selectNode]);
+  }, [graph, sourceNode, targetNode, showAllPaths, highlightPath, setFocusedNode, selectNode]);
 
   const handleClear = useCallback(() => {
     setSourceNode('');
@@ -84,12 +101,12 @@ export function AnalysisPanel() {
     });
   }, [setPickingMode]);
 
-  // Automatically find path when both fields are filled
+  // Automatically find path when both fields are filled or when showAllPaths changes
   useEffect(() => {
     if (graph && sourceNode && targetNode) {
       handleFindPath();
     }
-  }, [graph, sourceNode, targetNode, handleFindPath]);
+  }, [graph, sourceNode, targetNode, showAllPaths, handleFindPath]);
 
   return (
     <div className="p-3">
@@ -157,6 +174,15 @@ export function AnalysisPanel() {
                 </svg>
               </button>
             </div>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={showAllPaths}
+                onChange={(e) => setShowAllPaths(e.target.checked)}
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>Show all paths</span>
+            </label>
             <button
               onClick={handleClear}
               className="w-full px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded hover:bg-slate-50"
@@ -172,16 +198,33 @@ export function AnalysisPanel() {
 
         {pathResult && (
           <div>
-            <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
-              Path ({pathResult.length} nodes)
-            </h4>
-            <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto">
-              {pathResult.map((node, i) => (
-                <li key={node} className="text-slate-600 truncate" title={node}>
-                  {i + 1}. {node}
-                </li>
-              ))}
-            </ul>
+            {pathResult.length === 1 ? (
+              <>
+                <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                  Path ({pathResult[0].length} nodes)
+                </h4>
+                <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto">
+                  {pathResult[0].map((node, i) => (
+                    <li key={node} className="text-slate-600 truncate" title={node}>
+                      {i + 1}. {node}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <>
+                <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                  Found {pathResult.length} paths
+                </h4>
+                <ul className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                  {pathResult.map((path, i) => (
+                    <li key={i} className="text-slate-600">
+                      <span className="font-medium">Path {i + 1}:</span> {path.length} nodes
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         )}
 

@@ -13,7 +13,7 @@ import { HullRenderer } from './HullRenderer';
 import type { GraphNodeAttributes, GraphEdgeAttributes } from '../../types/graph';
 
 const SELECTED_HALO_COLOR = '#6366f1'; // indigo for selected node
-const NEIGHBOR_HALO_COLOR = '#ffffff'; // white for neighbors
+const NEIGHBOR_HALO_COLOR = '#1e293b'; // dark slate for neighbors
 
 type NodeDisplayDataWithSelected = PartialButFor<NodeDisplayData, 'x' | 'y' | 'size' | 'label' | 'color'> & {
   selected?: boolean;
