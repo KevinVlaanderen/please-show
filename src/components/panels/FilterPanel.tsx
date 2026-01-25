@@ -91,17 +91,6 @@ export function FilterPanel() {
 
   return (
     <div className="p-3 space-y-4">
-      {hasFilters && (
-        <div className="flex justify-end">
-          <button
-            onClick={clearFilters}
-            className="text-xs text-indigo-600 hover:text-indigo-800"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-
       {/* Binary filter */}
       <label className="flex items-center gap-2 cursor-pointer">
         <input
@@ -167,6 +156,17 @@ export function FilterPanel() {
               depth={0}
             />
           </div>
+        </div>
+      )}
+
+      {hasFilters && (
+        <div className="flex justify-end">
+          <button
+            onClick={clearFilters}
+            className="text-xs text-indigo-600 hover:text-indigo-800"
+          >
+            Clear all
+          </button>
         </div>
       )}
     </div>
