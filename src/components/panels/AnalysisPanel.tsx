@@ -15,6 +15,8 @@ export function AnalysisPanel() {
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
   const inspectionMode = useUIStore((state) => state.inspectionMode);
   const setInspectionMode = useUIStore((state) => state.setInspectionMode);
+  const inspectionTransitive = useUIStore((state) => state.inspectionTransitive);
+  const setInspectionTransitive = useUIStore((state) => state.setInspectionTransitive);
 
   const [inspectedNode, setInspectedNode] = useState('');
   const [sourceNode, setSourceNode] = useState('');
@@ -188,6 +190,15 @@ export function AnalysisPanel() {
               <option value="dependencies">Dependencies only</option>
               <option value="dependents">Dependents only</option>
             </select>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={inspectionTransitive}
+                onChange={(e) => setInspectionTransitive(e.target.checked)}
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>Show transitive dependencies</span>
+            </label>
             <button
               onClick={handleClearInspected}
               className="w-full px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded hover:bg-slate-50"

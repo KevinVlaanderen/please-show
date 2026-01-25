@@ -16,6 +16,7 @@ interface UIState {
 
   // Inspection mode
   inspectionMode: 'both' | 'dependencies' | 'dependents';
+  inspectionTransitive: boolean;
 
   // Search
   searchQuery: string;
@@ -36,6 +37,7 @@ interface UIState {
   highlightCycles: (cycles: string[][]) => void;
   clearHighlights: () => void;
   setInspectionMode: (mode: 'both' | 'dependencies' | 'dependents') => void;
+  setInspectionTransitive: (transitive: boolean) => void;
   setSearchQuery: (query: string) => void;
   setSearchOpen: (open: boolean) => void;
   setPickingMode: (mode: 'inspect' | 'source' | 'target' | null, callback: ((nodeId: string) => void) | null) => void;
@@ -50,6 +52,7 @@ export const useUIStore = create<UIState>((set) => ({
   highlightedPath: [],
   highlightedCycles: [],
   inspectionMode: 'both',
+  inspectionTransitive: false,
   searchQuery: '',
   searchOpen: false,
   pickingMode: null,
@@ -73,6 +76,7 @@ export const useUIStore = create<UIState>((set) => ({
   clearHighlights: () => set({ highlightedPath: [], highlightedCycles: [] }),
 
   setInspectionMode: (mode) => set({ inspectionMode: mode }),
+  setInspectionTransitive: (transitive) => set({ inspectionTransitive: transitive }),
 
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchOpen: (open) => set({ searchOpen: open }),
