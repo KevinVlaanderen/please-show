@@ -14,6 +14,7 @@ export function useApplyHighlights() {
   const graph = useAppStore((state) => state.graph);
   const highlightedPath = useUIStore((state) => state.highlightedPath);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
+  const inspectionMode = useUIStore((state) => state.inspectionMode);
 
   useEffect(() => {
     if (!graph) return;
@@ -40,18 +41,20 @@ export function useApplyHighlights() {
     const inboundEdges = new Set<string>();
 
     if (selectedNodeId && graph.hasNode(selectedNodeId)) {
-      // Track all neighbors
-      graph.forEachNeighbor(selectedNodeId, (neighbor) => {
-        neighborSet.add(neighbor);
-      });
-      // Track outbound edges (selected -> dependency)
-      graph.forEachOutEdge(selectedNodeId, (edge) => {
-        outboundEdges.add(edge);
-      });
-      // Track inbound edges (dependent -> selected)
-      graph.forEachInEdge(selectedNodeId, (edge) => {
-        inboundEdges.add(edge);
-      });
+      // Track outbound edges (selected -> dependency) and outbound neighbors
+      if (inspectionMode === 'both' || inspectionMode === 'dependencies') {
+        graph.forEachOutEdge(selectedNodeId, (edge, _attrs, _source, target) => {
+          outboundEdges.add(edge);
+          neighborSet.add(target);
+        });
+      }
+      // Track inbound edges (dependent -> selected) and inbound neighbors
+      if (inspectionMode === 'both' || inspectionMode === 'dependents') {
+        graph.forEachInEdge(selectedNodeId, (edge, _attrs, source) => {
+          inboundEdges.add(edge);
+          neighborSet.add(source);
+        });
+      }
     }
 
     // Apply node highlights
@@ -99,30 +102,32 @@ export function useApplyHighlights() {
       // Store original color and size if not already stored
       if (isHighlighted && !attrs.originalColor) {
         graph.setEdgeAttribute(edgeId, 'originalColor', attrs.color);
+        graph.setEdgeAttribute(edgeId, 'originalSize', attrs.size);
       }
 
       if (isPathEdge) {
         // Edges along the path (green, thicker)
         graph.setEdgeAttribute(edgeId, 'color', PATH_EDGE_COLOR);
-        graph.setEdgeAttribute(edgeId, 'size', attrs.size * 2);
+        graph.setEdgeAttribute(edgeId, 'size', 2);
         graph.setEdgeAttribute(edgeId, 'highlighted', true);
       } else if (isOutbound) {
         // Edges going from selected node to dependencies (green, thicker)
         graph.setEdgeAttribute(edgeId, 'color', OUTBOUND_EDGE_COLOR);
-        graph.setEdgeAttribute(edgeId, 'size', attrs.size * 2);
+        graph.setEdgeAttribute(edgeId, 'size', 2);
         graph.setEdgeAttribute(edgeId, 'highlighted', true);
       } else if (isInbound) {
         // Edges coming from dependents to selected node (red, thicker)
         graph.setEdgeAttribute(edgeId, 'color', INBOUND_EDGE_COLOR);
-        graph.setEdgeAttribute(edgeId, 'size', attrs.size * 2);
+        graph.setEdgeAttribute(edgeId, 'size', 2);
         graph.setEdgeAttribute(edgeId, 'highlighted', true);
       } else if (attrs.originalColor) {
         // Restore original color and size
         graph.setEdgeAttribute(edgeId, 'color', attrs.originalColor);
-        graph.setEdgeAttribute(edgeId, 'size', 1);
+        graph.setEdgeAttribute(edgeId, 'size', attrs.originalSize ?? 1);
         graph.setEdgeAttribute(edgeId, 'highlighted', false);
         graph.removeEdgeAttribute(edgeId, 'originalColor');
+        graph.removeEdgeAttribute(edgeId, 'originalSize');
       }
     });
-  }, [graph, highlightedPath, selectedNodeId]);
+  }, [graph, highlightedPath, selectedNodeId, inspectionMode]);
 }

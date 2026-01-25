@@ -12,7 +12,11 @@ export function AnalysisPanel() {
   const setPickingMode = useUIStore((state) => state.setPickingMode);
   const pickingMode = useUIStore((state) => state.pickingMode);
   const selectNode = useUIStore((state) => state.selectNode);
+  const selectedNodeId = useUIStore((state) => state.selectedNodeId);
+  const inspectionMode = useUIStore((state) => state.inspectionMode);
+  const setInspectionMode = useUIStore((state) => state.setInspectionMode);
 
+  const [inspectedNode, setInspectedNode] = useState('');
   const [sourceNode, setSourceNode] = useState('');
   const [targetNode, setTargetNode] = useState('');
   const [pathResult, setPathResult] = useState<string[][] | null>(null);
@@ -101,6 +105,36 @@ export function AnalysisPanel() {
     });
   }, [setPickingMode]);
 
+  const handlePickInspected = useCallback(() => {
+    setPickingMode('inspect', (nodeId: string) => {
+      setInspectedNode(nodeId);
+      selectNode(nodeId);
+    });
+  }, [setPickingMode, selectNode]);
+
+  const handleInspectedNodeChange = useCallback((value: string) => {
+    setInspectedNode(value);
+    if (value && graph?.hasNode(value)) {
+      selectNode(value);
+    } else if (!value) {
+      selectNode(null);
+    }
+  }, [graph, selectNode]);
+
+  const handleClearInspected = useCallback(() => {
+    setInspectedNode('');
+    selectNode(null);
+  }, [selectNode]);
+
+  // Sync inspectedNode with selectedNodeId (when clicking nodes on the graph)
+  useEffect(() => {
+    if (selectedNodeId !== null && selectedNodeId !== inspectedNode) {
+      setInspectedNode(selectedNodeId);
+    } else if (selectedNodeId === null && inspectedNode) {
+      setInspectedNode('');
+    }
+  }, [selectedNodeId, inspectedNode]);
+
   // Automatically find path when both fields are filled or when showAllPaths changes
   useEffect(() => {
     if (graph && sourceNode && targetNode) {
@@ -112,6 +146,58 @@ export function AnalysisPanel() {
     <div className="p-3">
       <div className="space-y-3">
         <div>
+          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+            Inspect Node
+          </h4>
+          <div className="space-y-2">
+            <div className="flex gap-1">
+              <input
+                type="text"
+                placeholder="Node (e.g., //src:main)"
+                value={inspectedNode}
+                onChange={(e) => handleInspectedNodeChange(e.target.value)}
+                className="flex-1 px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <button
+                onClick={handlePickInspected}
+                className={`px-2 py-1.5 border rounded hover:bg-slate-50 transition-colors ${
+                  pickingMode === 'inspect'
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-slate-300'
+                }`}
+                title="Pick node from graph"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                  <circle cx="12" cy="12" r="8" strokeWidth="1.5" />
+                  <path d="M12 2v4M12 18v4M2 12h4M18 12h4" strokeWidth="1.5" />
+                </svg>
+              </button>
+            </div>
+            <select
+              value={inspectionMode}
+              onChange={(e) => setInspectionMode(e.target.value as 'both' | 'dependencies' | 'dependents')}
+              className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="both">Both (dependencies + dependents)</option>
+              <option value="dependencies">Dependencies only</option>
+              <option value="dependents">Dependents only</option>
+            </select>
+            <button
+              onClick={handleClearInspected}
+              className="w-full px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded hover:bg-slate-50"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-200 pt-3">
           <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
             Find Path
           </h4>

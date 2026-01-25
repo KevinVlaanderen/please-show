@@ -14,12 +14,15 @@ interface UIState {
   highlightedPath: string[];
   highlightedCycles: string[][];
 
+  // Inspection mode
+  inspectionMode: 'both' | 'dependencies' | 'dependents';
+
   // Search
   searchQuery: string;
   searchOpen: boolean;
 
   // Node picking for path analysis
-  pickingMode: 'source' | 'target' | null;
+  pickingMode: 'inspect' | 'source' | 'target' | null;
   onNodePicked: ((nodeId: string) => void) | null;
 
   // Actions
@@ -32,9 +35,10 @@ interface UIState {
   highlightPath: (path: string[]) => void;
   highlightCycles: (cycles: string[][]) => void;
   clearHighlights: () => void;
+  setInspectionMode: (mode: 'both' | 'dependencies' | 'dependents') => void;
   setSearchQuery: (query: string) => void;
   setSearchOpen: (open: boolean) => void;
-  setPickingMode: (mode: 'source' | 'target' | null, callback: ((nodeId: string) => void) | null) => void;
+  setPickingMode: (mode: 'inspect' | 'source' | 'target' | null, callback: ((nodeId: string) => void) | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -45,6 +49,7 @@ export const useUIStore = create<UIState>((set) => ({
   focusedNodeId: null,
   highlightedPath: [],
   highlightedCycles: [],
+  inspectionMode: 'both',
   searchQuery: '',
   searchOpen: false,
   pickingMode: null,
@@ -66,6 +71,8 @@ export const useUIStore = create<UIState>((set) => ({
   highlightPath: (path) => set({ highlightedPath: path }),
   highlightCycles: (cycles) => set({ highlightedCycles: cycles }),
   clearHighlights: () => set({ highlightedPath: [], highlightedCycles: [] }),
+
+  setInspectionMode: (mode) => set({ inspectionMode: mode }),
 
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchOpen: (open) => set({ searchOpen: open }),
