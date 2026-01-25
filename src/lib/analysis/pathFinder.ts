@@ -3,22 +3,15 @@ import type { GraphNodeAttributes, GraphEdgeAttributes } from '../../types/graph
 
 /**
  * Find the shortest path between two nodes using BFS.
- * Searches in both directions since the graph is directed.
+ * Only follows edges in the dependent → dependency direction.
  */
 export function findShortestPath(
   graph: Graph<GraphNodeAttributes, GraphEdgeAttributes>,
   source: string,
   target: string
 ): string[] | null {
-  // Try forward direction (following edges)
-  const forwardPath = bfsPath(graph, source, target, 'out');
-  if (forwardPath) return forwardPath;
-
-  // Try reverse direction (against edges)
-  const reversePath = bfsPath(graph, source, target, 'in');
-  if (reversePath) return reversePath;
-
-  return null;
+  // Only follow edges in the out direction (dependent → dependency)
+  return bfsPath(graph, source, target, 'out');
 }
 
 /**

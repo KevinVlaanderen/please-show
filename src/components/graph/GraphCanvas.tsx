@@ -72,14 +72,31 @@ function GraphEvents() {
   const selectNode = useUIStore((state) => state.selectNode);
   const setHoveredNode = useUIStore((state) => state.setHoveredNode);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
+  const pickingMode = useUIStore((state) => state.pickingMode);
+  const onNodePicked = useUIStore((state) => state.onNodePicked);
+  const setPickingMode = useUIStore((state) => state.setPickingMode);
+  const highlightPath = useUIStore((state) => state.highlightPath);
 
   useEffect(() => {
     registerEvents({
       clickNode: (event) => {
-        selectNode(event.node);
+        // If in picking mode, call the callback and exit picking mode
+        if (pickingMode && onNodePicked) {
+          onNodePicked(event.node);
+          setPickingMode(null, null);
+        } else {
+          // Clear path highlighting when selecting a node
+          highlightPath([]);
+          selectNode(event.node);
+        }
       },
       clickStage: () => {
-        selectNode(null);
+        // Cancel picking mode on stage click
+        if (pickingMode) {
+          setPickingMode(null, null);
+        } else {
+          selectNode(null);
+        }
       },
       enterNode: (event) => {
         setHoveredNode(event.node);
@@ -102,7 +119,7 @@ function GraphEvents() {
         sigma.refresh();
       },
     });
-  }, [registerEvents, selectNode, setHoveredNode, sigma, selectedNodeId]);
+  }, [registerEvents, selectNode, setHoveredNode, sigma, selectedNodeId, pickingMode, onNodePicked, setPickingMode, highlightPath]);
 
   return null;
 }
@@ -148,6 +165,7 @@ interface GraphCanvasProps {
 
 export function GraphCanvas({ className }: GraphCanvasProps) {
   const graph = useAppStore((state) => state.graph);
+  const pickingMode = useUIStore((state) => state.pickingMode);
 
   // Memoize edge program classes to prevent unnecessary re-renders
   const edgeProgramClasses = useMemo(
@@ -175,7 +193,7 @@ export function GraphCanvas({ className }: GraphCanvasProps) {
 
   return (
     <SigmaContainer<GraphNodeAttributes, GraphEdgeAttributes>
-      className={className}
+      className={`${className} ${pickingMode ? 'cursor-crosshair' : ''}`}
       style={{ width: '100%', height: '100%' }}
       graph={emptyGraph.current}
       settings={{

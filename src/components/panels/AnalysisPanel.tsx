@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useUIStore } from '../../stores/uiStore';
 import { findShortestPath } from '../../lib/analysis/pathFinder';
@@ -9,6 +9,9 @@ export function AnalysisPanel() {
   const highlightPath = useUIStore((state) => state.highlightPath);
   const clearHighlights = useUIStore((state) => state.clearHighlights);
   const setFocusedNode = useUIStore((state) => state.setFocusedNode);
+  const setPickingMode = useUIStore((state) => state.setPickingMode);
+  const pickingMode = useUIStore((state) => state.pickingMode);
+  const selectNode = useUIStore((state) => state.selectNode);
 
   const [sourceNode, setSourceNode] = useState('');
   const [targetNode, setTargetNode] = useState('');
@@ -35,12 +38,13 @@ export function AnalysisPanel() {
     if (path) {
       setPathResult(path);
       highlightPath(path);
-      setFocusedNode(sourceNode);
+      // Clear node selection when finding a path
+      selectNode(null);
     } else {
       setError('No path found between these nodes');
       highlightPath([]);
     }
-  }, [graph, sourceNode, targetNode, highlightPath, setFocusedNode]);
+  }, [graph, sourceNode, targetNode, highlightPath, setFocusedNode, selectNode]);
 
   const handleClear = useCallback(() => {
     setSourceNode('');
@@ -68,6 +72,25 @@ export function AnalysisPanel() {
     }
   }, [graph, highlightPath, setFocusedNode]);
 
+  const handlePickSource = useCallback(() => {
+    setPickingMode('source', (nodeId: string) => {
+      setSourceNode(nodeId);
+    });
+  }, [setPickingMode]);
+
+  const handlePickTarget = useCallback(() => {
+    setPickingMode('target', (nodeId: string) => {
+      setTargetNode(nodeId);
+    });
+  }, [setPickingMode]);
+
+  // Automatically find path when both fields are filled
+  useEffect(() => {
+    if (graph && sourceNode && targetNode) {
+      handleFindPath();
+    }
+  }, [graph, sourceNode, targetNode, handleFindPath]);
+
   return (
     <div className="p-3">
       <div className="space-y-3">
@@ -76,35 +99,70 @@ export function AnalysisPanel() {
             Find Path
           </h4>
           <div className="space-y-2">
-            <input
-              type="text"
-              placeholder="Source (e.g., //src:main)"
-              value={sourceNode}
-              onChange={(e) => setSourceNode(e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-            <input
-              type="text"
-              placeholder="Target (e.g., //lib:util)"
-              value={targetNode}
-              onChange={(e) => setTargetNode(e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-            <div className="flex gap-2">
+            <div className="flex gap-1">
+              <input
+                type="text"
+                placeholder="Source (e.g., //src:main)"
+                value={sourceNode}
+                onChange={(e) => setSourceNode(e.target.value)}
+                className="flex-1 px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
               <button
-                onClick={handleFindPath}
-                disabled={!sourceNode || !targetNode}
-                className="flex-1 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handlePickSource}
+                className={`px-2 py-1.5 border rounded hover:bg-slate-50 transition-colors ${
+                  pickingMode === 'source'
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-slate-300'
+                }`}
+                title="Pick node from graph"
               >
-                Find Path
-              </button>
-              <button
-                onClick={handleClear}
-                className="px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded hover:bg-slate-50"
-              >
-                Clear
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                  <circle cx="12" cy="12" r="8" strokeWidth="1.5" />
+                  <path d="M12 2v4M12 18v4M2 12h4M18 12h4" strokeWidth="1.5" />
+                </svg>
               </button>
             </div>
+            <div className="flex gap-1">
+              <input
+                type="text"
+                placeholder="Target (e.g., //lib:util)"
+                value={targetNode}
+                onChange={(e) => setTargetNode(e.target.value)}
+                className="flex-1 px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <button
+                onClick={handlePickTarget}
+                className={`px-2 py-1.5 border rounded hover:bg-slate-50 transition-colors ${
+                  pickingMode === 'target'
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-slate-300'
+                }`}
+                title="Pick node from graph"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                  <circle cx="12" cy="12" r="8" strokeWidth="1.5" />
+                  <path d="M12 2v4M12 18v4M2 12h4M18 12h4" strokeWidth="1.5" />
+                </svg>
+              </button>
+            </div>
+            <button
+              onClick={handleClear}
+              className="w-full px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded hover:bg-slate-50"
+            >
+              Clear
+            </button>
           </div>
         </div>
 

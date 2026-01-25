@@ -78,9 +78,9 @@ export function parseGraph(data: PlzQueryOutput): Graph<GraphNodeAttributes, Gra
           const targetId = buildLabel(parsed.package, parsed.target);
 
           // Only create edge if target node exists
-          // Edge goes dependency → dependent so arrow points at dependent
-          if (graph.hasNode(targetId) && !graph.hasEdge(targetId, sourceId)) {
-            graph.addEdge(targetId, sourceId, {
+          // Edge goes dependent → dependency so arrow points at dependency
+          if (graph.hasNode(targetId) && !graph.hasEdge(sourceId, targetId)) {
+            graph.addEdge(sourceId, targetId, {
               color: '#94a3b8',
               size: 1,
               hidden: false,

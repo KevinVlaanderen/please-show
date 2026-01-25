@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { useUIStore } from '../stores/uiStore';
 
 const HIGHLIGHT_COLOR = '#dc2626'; // red for path highlighting
+const PATH_EDGE_COLOR = '#16a34a'; // green for edges on the path
 const OUTBOUND_EDGE_COLOR = '#16a34a'; // green for edges going away from selected
 const INBOUND_EDGE_COLOR = '#dc2626'; // red for edges coming into selected
 
@@ -18,6 +19,20 @@ export function useApplyHighlights() {
     if (!graph) return;
 
     const pathSet = new Set(highlightedPath);
+
+    // Build set of edges that are part of the path
+    const pathEdges = new Set<string>();
+    for (let i = 0; i < highlightedPath.length - 1; i++) {
+      const source = highlightedPath[i];
+      const target = highlightedPath[i + 1];
+
+      // Check for edge in both directions since the path may go either way
+      const outEdge = graph.edge(source, target);
+      const inEdge = graph.edge(target, source);
+
+      if (outEdge) pathEdges.add(outEdge);
+      if (inEdge) pathEdges.add(inEdge);
+    }
 
     // Build sets of neighbors and edges by direction from selected node
     const neighborSet = new Set<string>();
@@ -76,26 +91,35 @@ export function useApplyHighlights() {
 
     // Apply edge highlights
     graph.forEachEdge((edgeId, attrs) => {
+      const isPathEdge = pathEdges.has(edgeId);
       const isOutbound = outboundEdges.has(edgeId);
       const isInbound = inboundEdges.has(edgeId);
-      const isSelected = isOutbound || isInbound;
+      const isHighlighted = isPathEdge || isOutbound || isInbound;
 
-      // Store original color if not already stored
-      if (isSelected && !attrs.originalColor) {
+      // Store original color and size if not already stored
+      if (isHighlighted && !attrs.originalColor) {
         graph.setEdgeAttribute(edgeId, 'originalColor', attrs.color);
       }
 
-      if (isOutbound) {
-        // Edges going from selected node to dependencies (green)
+      if (isPathEdge) {
+        // Edges along the path (green, thicker)
+        graph.setEdgeAttribute(edgeId, 'color', PATH_EDGE_COLOR);
+        graph.setEdgeAttribute(edgeId, 'size', attrs.size * 2);
+        graph.setEdgeAttribute(edgeId, 'highlighted', true);
+      } else if (isOutbound) {
+        // Edges going from selected node to dependencies (green, thicker)
         graph.setEdgeAttribute(edgeId, 'color', OUTBOUND_EDGE_COLOR);
+        graph.setEdgeAttribute(edgeId, 'size', attrs.size * 2);
         graph.setEdgeAttribute(edgeId, 'highlighted', true);
       } else if (isInbound) {
-        // Edges coming from dependents to selected node (red)
+        // Edges coming from dependents to selected node (red, thicker)
         graph.setEdgeAttribute(edgeId, 'color', INBOUND_EDGE_COLOR);
+        graph.setEdgeAttribute(edgeId, 'size', attrs.size * 2);
         graph.setEdgeAttribute(edgeId, 'highlighted', true);
       } else if (attrs.originalColor) {
-        // Restore original color
+        // Restore original color and size
         graph.setEdgeAttribute(edgeId, 'color', attrs.originalColor);
+        graph.setEdgeAttribute(edgeId, 'size', 1);
         graph.setEdgeAttribute(edgeId, 'highlighted', false);
         graph.removeEdgeAttribute(edgeId, 'originalColor');
       }

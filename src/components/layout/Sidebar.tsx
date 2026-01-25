@@ -20,7 +20,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<Tab>('filters');
 
   return (
-    <aside className={`w-64 bg-white border-r border-slate-200 flex flex-col overflow-hidden ${className}`}>
+    <aside className={`w-72 bg-white border-r border-slate-200 flex flex-col overflow-hidden ${className}`}>
       <SearchPanel />
       <div className="border-b border-slate-200">
         <div className="flex">

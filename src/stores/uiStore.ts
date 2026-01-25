@@ -18,6 +18,10 @@ interface UIState {
   searchQuery: string;
   searchOpen: boolean;
 
+  // Node picking for path analysis
+  pickingMode: 'source' | 'target' | null;
+  onNodePicked: ((nodeId: string) => void) | null;
+
   // Actions
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -30,6 +34,7 @@ interface UIState {
   clearHighlights: () => void;
   setSearchQuery: (query: string) => void;
   setSearchOpen: (open: boolean) => void;
+  setPickingMode: (mode: 'source' | 'target' | null, callback: ((nodeId: string) => void) | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -42,6 +47,8 @@ export const useUIStore = create<UIState>((set) => ({
   highlightedCycles: [],
   searchQuery: '',
   searchOpen: false,
+  pickingMode: null,
+  onNodePicked: null,
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -62,4 +69,6 @@ export const useUIStore = create<UIState>((set) => ({
 
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchOpen: (open) => set({ searchOpen: open }),
+
+  setPickingMode: (mode, callback) => set({ pickingMode: mode, onNodePicked: callback }),
 }));
